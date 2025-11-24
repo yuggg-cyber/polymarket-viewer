@@ -3,238 +3,426 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Polymarket 深度盯盘</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <title>Batch Wallet Gen (Offline Only)</title>
+    <!-- 依赖库：需先联网加载，之后断网 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
     <style>
-        body { background-color: #0f172a; font-family: -apple-system, monospace; color: #cbd5e1; }
-        /* 买盘绿色背景条 */
-        .bid-bg { background: rgba(16, 185, 129, 0.15); }
-        /* 卖盘红色背景条 */
-        .ask-bg { background: rgba(244, 63, 94, 0.15); }
-        .nums { font-variant-numeric: tabular-nums; }
-        /* 弹窗动画 */
-        .modal-enter-active, .modal-leave-active { transition: opacity 0.3s ease; }
-        .modal-enter-from, .modal-leave-to { opacity: 0; }
+        /* 全局重置 */
+        * { box-sizing: border-box; outline: none; }
+        body {
+            margin: 0; padding: 40px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #fff;
+            color: #333;
+        }
+
+        .container { max-width: 1100px; margin: 0 auto; }
+
+        /* 标题区 */
+        h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; color: #111; }
+        .subtitle { color: #888; font-size: 14px; margin-bottom: 30px; }
+
+        /* 控制栏 */
+        .toolbar {
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+            position: relative; /* 用于定位安全标签 */
+        }
+
+        .label { font-size: 14px; color: #333; font-weight: 500; }
+
+        input[type="number"] {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100px;
+            font-size: 14px;
+            transition: border 0.2s;
+        }
+        input:focus { border-color: #000; }
+
+        /* 按钮样式 */
+        .btn-black {
+            background: #000; color: #fff; border: 1px solid #000;
+            padding: 9px 24px; border-radius: 4px; font-size: 14px;
+            cursor: pointer; transition: opacity 0.2s;
+        }
+        .btn-black:hover { opacity: 0.8; }
+        .btn-black:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .btn-stop {
+            background: #d93025; border-color: #d93025; color: #fff; display: none;
+        }
+
+        .btn-outline {
+            background: #fff; color: #333; border: 1px solid #ddd;
+            padding: 9px 24px; border-radius: 4px; font-size: 14px;
+            cursor: pointer; margin-left: auto; transition: all 0.2s;
+        }
+        .btn-outline:hover { border-color: #999; color: #000; }
+        .btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* 状态文字 */
+        .toolbar-status {
+            font-size: 14px; color: #666; margin-left: 5px;
+            font-feature-settings: "tnum";
+        }
+
+        /* 安全状态徽章 */
+        .security-badge {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-left: 10px;
+            font-weight: 600;
+        }
+        .bg-safe { background: #e6f4ea; color: #1e8e3e; } /* 绿色 */
+        .bg-danger { background: #fce8e6; color: #d93025; } /* 红色 */
+
+        /* 表格容器 */
+        .table-wrapper {
+            border: 1px solid #eee;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            table-layout: fixed; 
+        }
+
+        thead { background: #fafafa; }
+        
+        th {
+            text-align: left;
+            padding: 14px 16px;
+            color: #888;
+            font-weight: 500;
+            border-bottom: 1px solid #eee;
+        }
+
+        /* 列宽设置 */
+        th:nth-child(1) { width: 60px; }
+        th:nth-child(2) { width: 380px; }
+        th:nth-child(3) { width: 280px; }
+        th:nth-child(4) { width: auto; }
+
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #eee;
+            color: #444;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            height: 50px;
+        }
+
+        tr:last-child td { border-bottom: none; }
+        tbody tr:nth-child(even) { background-color: #fcfcfc; }
+        
+        /* 交互样式 */
+        .copyable {
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border-radius: 4px;
+            padding: 2px 4px;
+            margin: -2px -4px;
+        }
+        .copyable:active {
+            background-color: #e0e0e0;
+            color: #000 !important;
+            text-shadow: none !important;
+        }
+
+        .font-mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; }
+
+        .blur-text {
+            color: transparent;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
+            user-select: none; 
+        }
+        .blur-text:hover {
+            color: #333;
+            text-shadow: none;
+            user-select: auto;
+        }
+
+        /* 复制提示框 */
+        #toast {
+            position: fixed; top: 30px; left: 50%; transform: translateX(-50%) translateY(-20px);
+            background-color: rgba(0,0,0,0.85); color: #fff; padding: 10px 24px;
+            border-radius: 30px; font-size: 14px; opacity: 0; pointer-events: none;
+            transition: all 0.3s ease; z-index: 1000;
+        }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* ---------------- 网络阻断遮罩层 ---------------- */
+        #networkOverlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(5px);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            transition: opacity 0.3s;
+        }
+        
+        /* 隐藏状态 */
+        .hidden { display: none !important; }
+
+        .warning-icon {
+            width: 60px; height: 60px;
+            background: #d93025;
+            color: #fff;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 30px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .overlay-title { font-size: 24px; font-weight: 600; color: #d93025; margin-bottom: 10px; }
+        .overlay-desc { font-size: 16px; color: #555; max-width: 400px; line-height: 1.5; }
+        .overlay-tip { margin-top: 30px; font-size: 13px; color: #888; background: #f5f5f5; padding: 10px 20px; border-radius: 4px; }
+
     </style>
 </head>
-<body class="min-h-screen">
+<body>
 
-    <div id="app" class="container mx-auto px-4 py-6 max-w-6xl">
+<!-- 网络阻断遮罩 -->
+<div id="networkOverlay">
+    <div class="warning-icon">!</div>
+    <div class="overlay-title">网络连接已检测到</div>
+    <div class="overlay-desc">
+        为了确保私钥生成的绝对安全，程序禁止在联网状态下运行。<br>
+        请<b>拔掉网线</b>或<b>关闭 Wi-Fi</b> 后继续。
+    </div>
+    <div class="overlay-tip">提示：当前页面已加载完毕，断网不影响运行</div>
+</div>
+
+<div class="container">
+    <h1>Batch Wallet Gen</h1>
+    <div class="subtitle">批量以太坊钱包生成器 · 纯前端离线运行</div>
+
+    <div class="toolbar">
+        <span class="label">数量</span>
+        <input type="number" id="inpCount" value="10" min="1">
         
-        <!-- 顶部 -->
-        <header class="flex justify-between items-center mb-6 pb-4 border-b border-slate-800">
-            <h1 class="text-xl font-bold text-white flex items-center gap-2">
-                <span class="text-blue-500">📊</span> Polymarket 深度盯盘
-            </h1>
-            <div class="text-xs text-slate-500">
-                点击价格按钮查看实时挂单 (Order Book)
-            </div>
-        </header>
+        <button id="btnStart" class="btn-black">开始生成</button>
+        <button id="btnStop" class="btn-black btn-stop">停止</button>
+        
+        <span id="statusText" class="toolbar-status">就绪</span>
+        
+        <!-- 安全状态指示器 -->
+        <span id="badge" class="security-badge bg-safe">OFFLINE</span>
 
-        <!-- 市场列表 (左侧选择) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div v-for="market in markets" :key="market.condition_id" 
-                 class="bg-slate-900 border border-slate-800 rounded-lg p-4 hover:border-blue-500/30 transition-colors">
-                
-                <h3 class="text-sm text-slate-200 font-medium mb-4 line-clamp-2 h-10 leading-snug">
-                    <a :href="'https://polymarket.com/event/' + market.market_slug" target="_blank" class="hover:underline">
-                        {{ market.question }}
-                    </a>
-                </h3>
-
-                <!-- 操作按钮区 -->
-                <div class="space-y-2">
-                    <div v-for="token in (market.tokens || []).slice(0, 2)" :key="token.token_id" 
-                         class="flex justify-between items-center bg-slate-950 p-2 rounded border border-slate-800">
-                        <span class="text-xs font-bold text-slate-400 w-12">{{ token.outcome }}</span>
-                        
-                        <!-- 点击这个按钮触发盯盘 -->
-                        <button @click="openBook(market, token)" 
-                                class="flex-1 ml-3 bg-slate-800 hover:bg-slate-700 text-white py-1 px-3 rounded text-xs font-mono flex justify-between group transition-all active:scale-95 border border-slate-700 hover:border-blue-500">
-                            <span>查看深度</span>
-                            <span :class="token.price > 0.5 ? 'text-green-400' : 'text-blue-400'" class="font-bold">
-                                {{ (token.price * 100).toFixed(1) }}¢
-                            </span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 📡 实时挂单弹窗 (核心功能) -->
-        <transition name="modal">
-            <div v-if="selectedToken" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" @click.self="closeBook">
-                <div class="bg-[#1e293b] w-full max-w-2xl rounded-xl shadow-2xl border border-slate-700 overflow-hidden flex flex-col max-h-[90vh]">
-                    
-                    <!-- 弹窗头部 -->
-                    <div class="p-4 border-b border-slate-700 bg-slate-900 flex justify-between items-start">
-                        <div>
-                            <div class="text-xs text-slate-500 mb-1">正在盯盘:</div>
-                            <h3 class="font-bold text-white text-sm md:text-base pr-4">{{ selectedMarket.question }}</h3>
-                            <div class="mt-2 inline-flex items-center gap-2 px-2 py-1 bg-slate-800 rounded text-xs font-mono">
-                                <span class="text-slate-400">选项:</span>
-                                <span class="font-bold text-white">{{ selectedToken.outcome }}</span>
-                                <span class="text-slate-600">|</span>
-                                <span class="text-green-400 animate-pulse">● 实时刷新中 (2s)</span>
-                            </div>
-                        </div>
-                        <button @click="closeBook" class="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
-                    </div>
-
-                    <!-- 订单簿主体 (买卖盘) -->
-                    <div class="flex-1 overflow-auto p-2 bg-[#0f172a] font-mono text-xs">
-                        <div class="grid grid-cols-2 gap-2 h-full">
-                            
-                            <!-- 买盘 (Bids) -->
-                            <div class="flex flex-col">
-                                <div class="text-center text-green-500 font-bold border-b border-slate-800 pb-2 mb-2">买单 (Bids)</div>
-                                <div class="flex justify-between text-slate-500 px-2 mb-1 text-[10px]">
-                                    <span>数量 (Size)</span>
-                                    <span>价格 (Price)</span>
-                                </div>
-                                <div class="flex-1 overflow-auto space-y-0.5">
-                                    <div v-for="(bid, i) in orderBook.bids" :key="'b'+i" 
-                                         class="flex justify-between px-2 py-1 rounded relative overflow-hidden text-slate-200">
-                                        <!-- 深度条 -->
-                                        <div class="absolute right-0 top-0 bottom-0 bg-green-500/20" :style="{width: getDepthWidth(bid.size) + '%'}"></div>
-                                        <span class="relative z-10">{{ formatSize(bid.size) }}</span>
-                                        <span class="relative z-10 text-green-400 font-bold">{{ bid.price }}</span>
-                                    </div>
-                                    <div v-if="orderBook.bids.length === 0" class="text-center text-slate-600 py-4">暂无买单</div>
-                                </div>
-                            </div>
-
-                            <!-- 卖盘 (Asks) -->
-                            <div class="flex flex-col">
-                                <div class="text-center text-red-500 font-bold border-b border-slate-800 pb-2 mb-2">卖单 (Asks)</div>
-                                <div class="flex justify-between text-slate-500 px-2 mb-1 text-[10px]">
-                                    <span>价格 (Price)</span>
-                                    <span>数量 (Size)</span>
-                                </div>
-                                <div class="flex-1 overflow-auto space-y-0.5">
-                                    <div v-for="(ask, i) in orderBook.asks" :key="'a'+i" 
-                                         class="flex justify-between px-2 py-1 rounded relative overflow-hidden text-slate-200">
-                                        <!-- 深度条 -->
-                                        <div class="absolute left-0 top-0 bottom-0 bg-red-500/20" :style="{width: getDepthWidth(ask.size) + '%'}"></div>
-                                        <span class="relative z-10 text-red-400 font-bold">{{ ask.price }}</span>
-                                        <span class="relative z-10">{{ formatSize(ask.size) }}</span>
-                                    </div>
-                                    <div v-if="orderBook.asks.length === 0" class="text-center text-slate-600 py-4">暂无卖单</div>
-                                </div>
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </transition>
-
-        <!-- 加载状态 -->
-        <div v-if="loading && markets.length===0" class="text-center text-slate-500 mt-20">正在连接交易所...</div>
-
+        <button id="btnExport" class="btn-outline" disabled>导出 Excel</button>
     </div>
 
-    <script>
-        const { createApp, ref, onMounted, onUnmounted } = Vue;
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>地址 (Address)</th>
+                    <th>私钥 (Private Key) <span style="font-size:11px; font-weight:normal">移入查看/点击复制</span></th>
+                    <th>助记词 (Mnemonic)</th>
+                </tr>
+            </thead>
+            <tbody id="tbody">
+                <!-- 动态插入 -->
+            </tbody>
+        </table>
+    </div>
+</div>
 
-        createApp({
-            setup() {
-                // 👇 你的 Cloudflare Worker 地址
-                const WORKER_URL = 'https://gentle-wave-3a18.9241858.workers.dev'; 
+<div id="toast">已复制到剪贴板</div>
 
-                const markets = ref([]);
-                const loading = ref(false);
-                
-                // 盯盘相关状态
-                const selectedMarket = ref(null);
-                const selectedToken = ref(null);
-                const orderBook = ref({ bids: [], asks: [] });
-                const timer = ref(null);
+<script>
+    // 状态管理
+    let isRunning = false;
+    let targetTotal = 0;
+    let currentCount = 0;
+    let walletData = [];
+    let startTime = 0;
 
-                // 1. 获取市场列表 (用于选择)
-                const fetchMarkets = async () => {
-                    loading.value = true;
-                    try {
-                        const res = await axios.get(`${WORKER_URL}?mode=list`); // 使用 mode=list
-                        let data = res.data;
-                        if(typeof data === 'string') try { data = JSON.parse(data); } catch(e){}
-                        markets.value = (data.data || []).filter(m => m.tokens && m.tokens.length >= 2);
-                    } catch (e) {
-                        console.error(e);
-                    } finally {
-                        loading.value = false;
-                    }
-                };
+    // DOM 元素
+    const ui = {
+        inp: document.getElementById('inpCount'),
+        start: document.getElementById('btnStart'),
+        stop: document.getElementById('btnStop'),
+        export: document.getElementById('btnExport'),
+        tbody: document.getElementById('tbody'),
+        status: document.getElementById('statusText'),
+        toast: document.getElementById('toast'),
+        overlay: document.getElementById('networkOverlay'),
+        badge: document.getElementById('badge')
+    };
 
-                // 2. 打开盯盘窗口
-                const openBook = (market, token) => {
-                    selectedMarket.value = market;
-                    selectedToken.value = token;
-                    orderBook.value = { bids: [], asks: [] }; // 清空旧数据
-                    
-                    // 立即抓取一次，然后开启轮询
-                    fetchBook();
-                    timer.value = setInterval(fetchBook, 2000); // 每2秒刷新一次
-                };
+    // ================= 网络检测逻辑 (核心新增) =================
+    
+    function checkOnlineStatus() {
+        const isOnline = navigator.onLine;
 
-                // 3. 关闭窗口
-                const closeBook = () => {
-                    selectedToken.value = null;
-                    selectedMarket.value = null;
-                    if (timer.value) {
-                        clearInterval(timer.value);
-                        timer.value = null;
-                    }
-                };
-
-                // 4. 获取订单簿数据 (核心)
-                const fetchBook = async () => {
-                    if (!selectedToken.value) return;
-                    try {
-                        // 使用 mode=book 并传入 token_id
-                        const url = `${WORKER_URL}?mode=book&token_id=${selectedToken.value.token_id}`;
-                        const res = await axios.get(url);
-                        let data = res.data;
-                        
-                        // CLOB API 返回格式: { bids: [{price, size}, ...], asks: [...] }
-                        // 数据处理：只取前20档，并转换数值
-                        orderBook.value = {
-                            bids: (data.bids || []).slice(0, 20),
-                            asks: (data.asks || []).slice(0, 20)
-                        };
-
-                    } catch (e) {
-                        console.error("盯盘失败:", e);
-                    }
-                };
-
-                // 辅助：计算深度条宽度 (视觉效果)
-                const getDepthWidth = (size) => {
-                    const s = parseFloat(size);
-                    // 假设最大单笔是 5000U，按比例显示宽度
-                    return Math.min((s / 5000) * 100, 100); 
-                };
-
-                const formatSize = (s) => parseFloat(s).toFixed(2);
-
-                onMounted(() => {
-                    fetchMarkets();
-                });
-
-                onUnmounted(() => {
-                    if (timer.value) clearInterval(timer.value);
-                });
-
-                return {
-                    markets, loading,
-                    selectedMarket, selectedToken, orderBook,
-                    openBook, closeBook,
-                    getDepthWidth, formatSize
-                };
+        if (isOnline) {
+            // 联网：显示遮罩，阻止操作
+            ui.overlay.classList.remove('hidden');
+            ui.badge.innerText = 'ONLINE - UNSAFE';
+            ui.badge.className = 'security-badge bg-danger';
+            
+            // 如果正在运行，强制停止
+            if (isRunning) {
+                stopGeneration();
+                alert('检测到网络连接！为保障安全，生成已强制停止。');
             }
-        }).mount('#app');
-    </script>
+        } else {
+            // 断网：隐藏遮罩，允许操作
+            ui.overlay.classList.add('hidden');
+            ui.badge.innerText = 'OFFLINE - SAFE';
+            ui.badge.className = 'security-badge bg-safe';
+        }
+    }
+
+    // 监听网络状态变化事件
+    window.addEventListener('online', checkOnlineStatus);
+    window.addEventListener('offline', checkOnlineStatus);
+    
+    // 初始化检查
+    checkOnlineStatus();
+
+    // =========================================================
+
+    function showToast(msg) {
+        ui.toast.innerText = msg;
+        ui.toast.classList.add('show');
+        setTimeout(() => ui.toast.classList.remove('show'), 2000);
+    }
+
+    ui.tbody.addEventListener('click', async (e) => {
+        const target = e.target.closest('.copyable');
+        if (target) {
+            const textToCopy = target.innerText;
+            if (!textToCopy) return;
+            try {
+                await navigator.clipboard.writeText(textToCopy);
+                const shortText = textToCopy.length > 15 
+                    ? textToCopy.substring(0, 8) + '...' + textToCopy.substring(textToCopy.length - 4) 
+                    : textToCopy;
+                showToast(`已复制: ${shortText}`);
+            } catch (err) {
+                showToast('复制失败');
+            }
+        }
+    });
+
+    function generateOne() {
+        // 双重保险：如果突然联网，或者达到目标，则停止
+        if (!isRunning || currentCount >= targetTotal || navigator.onLine) {
+            finish();
+            return;
+        }
+
+        const wallet = ethers.Wallet.createRandom();
+        currentCount++;
+        
+        walletData.push({
+            id: currentCount,
+            address: wallet.address,
+            privateKey: wallet.privateKey,
+            mnemonic: wallet.mnemonic.phrase
+        });
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${currentCount}</td>
+            <td class="font-mono copyable" title="点击复制地址">${wallet.address}</td>
+            <td><div class="blur-text font-mono copyable" title="点击复制私钥">${wallet.privateKey}</div></td>
+            <td><div class="blur-text copyable" title="点击复制助记词">${wallet.mnemonic.phrase}</div></td>
+        `;
+        ui.tbody.appendChild(tr);
+
+        ui.status.innerText = `正在生成... ${currentCount} / ${targetTotal}`;
+
+        if (isRunning) {
+            requestAnimationFrame(generateOne); 
+        }
+    }
+
+    ui.start.onclick = () => {
+        // 安全检查
+        if (navigator.onLine) {
+            alert('请先断开网络！');
+            checkOnlineStatus(); // 重新触发遮罩
+            return;
+        }
+        
+        if(typeof ethers === 'undefined') return alert('ethers.js 未加载，请先联网刷新页面加载资源，然后断网。');
+        
+        const val = parseInt(ui.inp.value);
+        if(!val || val <= 0) return;
+
+        targetTotal = val;
+        currentCount = 0;
+        walletData = [];
+        isRunning = true;
+        startTime = performance.now();
+
+        ui.tbody.innerHTML = ''; 
+        ui.inp.disabled = true;
+        ui.start.style.display = 'none';
+        ui.stop.style.display = 'block'; 
+        ui.export.disabled = true;
+        
+        generateOne();
+    };
+
+    function stopGeneration() {
+        isRunning = false;
+        ui.status.innerText = `已停止，共生成 ${currentCount} 个`;
+        resetBtnState();
+    }
+
+    ui.stop.onclick = stopGeneration;
+
+    function finish() {
+        // 如果是因为联网导致的结束，已经在 checkOnlineStatus 里处理了，这里只处理正常完成
+        if (isRunning) { 
+            isRunning = false;
+            const duration = ((performance.now() - startTime) / 1000).toFixed(2);
+            ui.status.innerText = `已完成 ${currentCount} 个钱包，耗时 ${duration} 秒`;
+            resetBtnState();
+        }
+    }
+
+    function resetBtnState() {
+        ui.inp.disabled = false;
+        ui.start.style.display = 'block';
+        ui.stop.style.display = 'none';
+        if (walletData.length > 0) ui.export.disabled = false;
+    }
+
+    ui.export.onclick = () => {
+        const ws = XLSX.utils.json_to_sheet(walletData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Wallets");
+        XLSX.writeFile(wb, `Batch_Gen_${currentCount}.xlsx`);
+    };
+</script>
+
 </body>
 </html>
