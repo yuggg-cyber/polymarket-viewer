@@ -3,16 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Polymarket Crypto Live</title>
+    <title>Polymarket Crypto Now (2025)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #0b1221; }
-        .font-nums { font-variant-numeric: tabular-nums; }
-        .shine { position: relative; overflow: hidden; }
-        .shine::after { content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent); transform: skewX(-25deg); animation: shine 3s infinite; }
-        @keyframes shine { 100% { left: 200%; } }
+        body { background-color: #0b1221; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+        .scanning-line {
+            height: 2px;
+            width: 100%;
+            background: linear-gradient(to right, transparent, #f97316, transparent);
+            animation: scan 1.5s linear infinite;
+        }
+        @keyframes scan { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
     </style>
 </head>
 <body class="text-slate-300 min-h-screen">
@@ -20,89 +23,88 @@
     <div id="app" class="container mx-auto px-4 py-8 max-w-7xl">
         <!-- 头部 -->
         <header class="mb-8 border-b border-slate-800 pb-6">
-            <div class="flex flex-col md:flex-row justify-between md:items-end gap-4">
+            <h1 class="text-3xl font-bold text-white flex items-center gap-3 mb-2">
+                <span class="text-orange-500">⚡</span> 最新加密货币预测
+            </h1>
+            <p class="text-slate-500 text-sm">
+                当前时间: <span class="text-white font-mono">{{ nowStr }}</span> | 
+                <span class="text-orange-400">只显示在此之后的盘口</span>
+            </p>
+            
+            <!-- 状态面板 -->
+            <div class="mt-4 bg-slate-900 rounded-lg p-3 border border-slate-800 flex flex-wrap gap-4 text-xs font-mono">
                 <div>
-                    <h1 class="text-3xl font-bold text-white flex items-center gap-3">
-                        <span class="text-orange-500 text-4xl">₿</span> Crypto 实时盘口
-                    </h1>
-                    <p class="text-slate-500 text-sm mt-2">
-                        只显示截止日期在 <span class="text-orange-400 font-mono">{{ todayStr }}</span> 之后的有效预测
-                    </p>
+                    <span class="text-slate-500">已扫描原始数据:</span>
+                    <span class="text-white ml-1">{{ scannedCount }} 条</span>
                 </div>
-                
-                <div class="flex gap-3 text-xs">
-                    <div class="bg-slate-900 px-4 py-2 rounded-lg border border-slate-800">
-                        <div class="text-slate-500">已扫描</div>
-                        <div class="text-white font-mono text-lg">{{ rawCount }}</div>
-                    </div>
-                    <div class="bg-slate-900 px-4 py-2 rounded-lg border border-orange-500/30">
-                        <div class="text-orange-500">Crypto</div>
-                        <div class="text-white font-mono text-lg font-bold">{{ cryptoMarkets.length }}</div>
-                    </div>
+                <div>
+                    <span class="text-slate-500">过滤掉的过期/无关数据:</span>
+                    <span class="text-red-400 ml-1">{{ scannedCount - validMarkets.length }} 条</span>
                 </div>
+                <div>
+                    <span class="text-slate-500">有效新数据:</span>
+                    <span class="text-green-400 ml-1 font-bold text-sm">{{ validMarkets.length }} 条</span>
+                </div>
+            </div>
+            
+            <!-- 扫描动画 -->
+            <div v-if="loading" class="mt-4 w-full bg-slate-900 h-1 overflow-hidden relative rounded-full">
+                <div class="scanning-line"></div>
+            </div>
+            <div v-if="loading" class="text-center text-orange-400 text-xs mt-2 animate-pulse">
+                正在暴力清洗历史数据，寻找最新盘口... (已跳过 {{ scannedCount }} 条)
             </div>
         </header>
 
         <!-- 错误提示 -->
         <div v-if="error" class="bg-red-900/30 border border-red-500/50 p-4 rounded text-center text-red-200 mb-6">
-            {{ error }} <button @click="fetchMarkets" class="underline ml-2">重试</button>
+            {{ error }}
+            <button @click="initSearch" class="underline ml-2">重试</button>
         </div>
 
         <!-- 列表 -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            <div v-for="market in cryptoMarkets" :key="market.condition_id" 
-                 class="bg-[#131b2e] border border-slate-800 rounded-xl p-5 hover:border-orange-500/40 transition-all duration-300 flex flex-col group relative overflow-hidden shadow-lg">
+            <div v-for="market in validMarkets" :key="market.condition_id" 
+                 class="bg-[#131b2e] border border-slate-800 rounded-xl p-5 hover:border-orange-500/50 transition-all flex flex-col relative group">
                 
-                <!-- 顶部元数据 -->
-                <div class="flex justify-between items-start mb-3 text-[10px] font-mono z-10">
-                    <span class="bg-slate-800 text-orange-400 px-2 py-1 rounded border border-slate-700">
-                        {{ detectCategory(market.question) }}
-                    </span>
-                    <span class="text-slate-500 flex items-center gap-1">
-                        🕒 截止: {{ formatDate(market.end_date_iso) }}
+                <!-- 截止日期 (高亮显示) -->
+                <div class="absolute top-0 right-0 bg-slate-800 text-[10px] px-2 py-1 rounded-bl-lg border-b border-l border-slate-700 text-green-400 font-mono">
+                    截止: {{ formatDate(market.end_date_iso) }}
+                </div>
+
+                <!-- 标签 -->
+                <div class="mb-3 mt-1">
+                    <span class="bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded text-[10px] font-bold">
+                        {{ detectCoin(market.question) }}
                     </span>
                 </div>
 
                 <!-- 标题 -->
-                <h3 class="font-medium text-slate-100 text-[15px] leading-relaxed mb-4 z-10 line-clamp-3 group-hover:text-orange-300 transition-colors">
-                    <a :href="'https://polymarket.com/event/' + market.market_slug" target="_blank" class="block h-full">
+                <h3 class="font-medium text-slate-100 text-[15px] leading-relaxed mb-4 line-clamp-3 group-hover:text-orange-300 transition-colors h-[4.5rem]">
+                    <a :href="'https://polymarket.com/event/' + market.market_slug" target="_blank">
                         {{ market.question }}
                     </a>
                 </h3>
 
-                <!-- 价格条 -->
-                <div class="mt-auto space-y-3 z-10">
+                <!-- 价格 -->
+                <div class="mt-auto space-y-2">
                     <div v-for="(token, idx) in (market.tokens || []).slice(0, 2)" :key="idx" 
-                         class="relative">
-                        <!-- 进度条背景 -->
-                        <div class="absolute inset-0 bg-slate-800 rounded overflow-hidden h-8">
-                            <div class="h-full bg-slate-700/50" :style="{width: (token.price * 100) + '%'}"></div>
-                        </div>
-                        
-                        <!-- 价格文字 -->
-                        <div class="relative flex justify-between items-center h-8 px-3 text-xs">
-                            <span class="text-slate-300 font-medium truncate w-2/3">{{ token.outcome }}</span>
-                            <span class="font-mono font-bold text-white">
-                                {{ (token.price * 100).toFixed(0) }}<span class="text-[9px] text-slate-400">%</span>
-                            </span>
-                        </div>
+                         class="flex justify-between items-center text-xs bg-slate-900/50 p-2 rounded">
+                        <span class="text-slate-400 truncate max-w-[60%]">{{ token.outcome }}</span>
+                        <span class="font-mono font-bold" :class="token.price > 0.5 ? 'text-green-400' : 'text-blue-400'">
+                            {{ (token.price * 100).toFixed(0) }}¢
+                        </span>
                     </div>
                 </div>
-
-                <!-- 底部交互提示 -->
-                <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 to-purple-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
             </div>
         </div>
-
-        <!-- 加载更多 -->
-        <div class="py-12 text-center">
-            <button v-if="nextCursor" @click="loadMore" :disabled="loading"
-                    class="px-8 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-full font-medium transition-colors border border-slate-700 disabled:opacity-50 shine">
-                {{ loading ? '正在搜寻全网数据...' : '加载更多 (Load More)' }}
+        
+        <!-- 底部加载 -->
+        <div class="py-12 text-center" v-if="validMarkets.length > 0">
+            <button @click="loadMore" :disabled="loading"
+                    class="px-8 py-2 bg-slate-800 border border-slate-700 hover:bg-slate-700 rounded-full text-sm transition-colors disabled:opacity-50">
+                {{ loading ? '正在搜寻更多...' : '加载更多 (Load More)' }}
             </button>
-            <p v-else-if="!loading && cryptoMarkets.length === 0" class="text-slate-500">
-                暂无符合条件的加密货币盘口
-            </p>
         </div>
     </div>
 
@@ -114,105 +116,118 @@
                 // 👇 你的 Worker 地址 (保持不变)
                 const WORKER_URL = 'https://gentle-wave-3a18.9241858.workers.dev'; 
 
-                const markets = ref([]);
-                const nextCursor = ref(null);
+                const validMarkets = ref([]);   // 最终展示的列表
+                const nextCursor = ref(null);   // 翻页游标
                 const loading = ref(false);
                 const error = ref(null);
-                const rawCount = ref(0);
-                const todayStr = new Date().toLocaleDateString();
+                const scannedCount = ref(0);    // 统计一共扫描了多少垃圾数据
+                
+                const now = new Date(); // 当前时间
+                const nowStr = now.toLocaleDateString();
 
-                // 🔍 加密货币关键词库 (扩展版)
+                // 🔍 加密货币关键词
                 const CRYPTO_KEYWORDS = [
                     'Bitcoin', 'BTC', 'Ethereum', 'ETH', 'Solana', 'SOL', 
-                    'Crypto', 'Token', 'Airdrop', 'NFT', 'Price', 'Market Cap', 
-                    'USDC', 'USDT', 'XRP', 'Doge', 'ETF', 'Binance', 'Coinbase',
-                    'Above', 'Below', 'Hit', 'Reach' // 这些词常配合币价出现
+                    'Crypto', 'Token', 'Airdrop', 'NFT', 'Price', 'USDC', 'USDT', 
+                    'ETF', 'Binance', 'Coinbase', 'Trump', 'Polymarket' // Trump常关联Crypto盘口
                 ];
 
-                // ⚡ 过滤逻辑：只显示 Crypto 相关
-                const cryptoMarkets = computed(() => {
-                    return markets.value.filter(market => {
-                        const q = market.question.toLowerCase();
-                        
-                        // 1. 必须包含关键词
-                        const hasKeyword = CRYPTO_KEYWORDS.some(k => q.includes(k.toLowerCase()));
-                        if (!hasKeyword) return false;
+                // 🛠️ 核心：判断一个盘口是否“新鲜”且“相关”
+                const isValidMarket = (m) => {
+                    // 1. 必须有截止日期
+                    if (!m.end_date_iso) return false;
+                    
+                    // 2. 截止日期必须在今天之后 (关键修改！)
+                    const endDate = new Date(m.end_date_iso);
+                    if (endDate < now) return false;
 
-                        // 2. 必须有价格数据
-                        if (!market.tokens || market.tokens.length < 2) return false;
+                    // 3. 必须包含关键词
+                    const q = m.question.toLowerCase();
+                    const isCrypto = CRYPTO_KEYWORDS.some(k => q.includes(k.toLowerCase()));
+                    if (!isCrypto) return false;
 
-                        return true;
-                    });
-                });
+                    // 4. 必须有价格
+                    if (!m.tokens || m.tokens.length < 2) return false;
 
-                const detectCategory = (q) => {
-                    q = q.toLowerCase();
-                    if (q.includes('btc') || q.includes('bitcoin')) return 'BTC';
-                    if (q.includes('eth')) return 'ETH';
-                    if (q.includes('sol')) return 'SOL';
-                    if (q.includes('nft')) return 'NFT';
-                    return 'CRYPTO';
+                    return true;
                 };
 
-                const formatDate = (isoStr) => {
-                    if (!isoStr) return 'Unknown';
-                    const date = new Date(isoStr);
-                    return date.toLocaleDateString() // 只显示日期，简洁一点
-                };
-
-                const fetchMarkets = async (isLoadMore = false) => {
-                    if (loading.value) return;
-                    loading.value = true;
-                    error.value = null;
-
+                // 🔄 递归抓取函数：如果不满一屏数据，就一直抓下一页
+                const fetchAndFilter = async (cursor = null, accumulate = false) => {
                     try {
-                        let url = WORKER_URL;
-                        // 加个随机数防止浏览器缓存老数据
-                        const cacheBuster = `&_t=${new Date().getTime()}`;
+                        let url = `${WORKER_URL}?limit=100`; // 每次抓100条
+                        if (cursor) url += `&cursor=${cursor}`;
                         
-                        if (isLoadMore && nextCursor.value) {
-                            url += `?cursor=${nextCursor.value}${cacheBuster}`;
-                        } else {
-                            url += `?start=true${cacheBuster}`;
-                        }
+                        // 加时间戳防缓存
+                        url += `&_t=${new Date().getTime()}`;
 
                         const response = await axios.get(url);
                         let result = response.data;
-                        if (typeof result === 'string') {
-                            try { result = JSON.parse(result); } catch(e) {}
-                        }
+                        if (typeof result === 'string') try { result = JSON.parse(result); } catch(e){}
 
-                        const newMarkets = result.data || [];
-                        const cursor = result.next_cursor || null;
+                        const rawList = result.data || [];
+                        const newCursor = result.next_cursor;
+                        
+                        scannedCount.value += rawList.length;
 
-                        // 简单的去重逻辑 (防止翻页出现重复)
-                        const existingIds = new Set(markets.value.map(m => m.condition_id));
-                        const uniqueNewMarkets = newMarkets.filter(m => !existingIds.has(m.condition_id));
-
-                        if (isLoadMore) {
-                            markets.value = [...markets.value, ...uniqueNewMarkets];
+                        // 🔍 过滤出有效数据
+                        const freshData = rawList.filter(isValidMarket);
+                        
+                        // 更新 UI
+                        if (accumulate) {
+                            validMarkets.value = [...validMarkets.value, ...freshData];
                         } else {
-                            markets.value = uniqueNewMarkets;
+                            // 初始加载时，是追加模式
+                            validMarkets.value = [...validMarkets.value, ...freshData];
                         }
                         
-                        rawCount.value = markets.value.length;
-                        nextCursor.value = cursor;
+                        nextCursor.value = newCursor;
+
+                        // 🧠 智能判断：如果当前找到的有效数据太少 (小于12条)，且还有下一页，自动继续抓！
+                        if (validMarkets.value.length < 12 && newCursor) {
+                            console.log(`有效数据不足 (${validMarkets.value.length}条)，继续扫描下一页...`);
+                            await fetchAndFilter(newCursor, true);
+                        } else {
+                            loading.value = false; // 凑够了，停止加载
+                        }
 
                     } catch (err) {
                         console.error(err);
-                        error.value = "加载失败，请检查网络。";
-                    } finally {
+                        error.value = "数据流中断: " + err.message;
                         loading.value = false;
                     }
                 };
 
-                const loadMore = () => fetchMarkets(true);
+                const initSearch = () => {
+                    loading.value = true;
+                    error.value = null;
+                    validMarkets.value = [];
+                    scannedCount.value = 0;
+                    fetchAndFilter(null, false);
+                };
 
-                onMounted(() => fetchMarkets());
+                const loadMore = () => {
+                    loading.value = true;
+                    fetchAndFilter(nextCursor.value, true);
+                };
+
+                const detectCoin = (q) => {
+                    q = q.toLowerCase();
+                    if(q.includes('bitcoin') || q.includes('btc')) return 'BTC';
+                    if(q.includes('eth')) return 'ETH';
+                    if(q.includes('sol')) return 'SOL';
+                    return 'CRYPTO';
+                }
+
+                const formatDate = (iso) => new Date(iso).toLocaleDateString();
+
+                onMounted(() => {
+                    initSearch();
+                });
 
                 return {
-                    markets, cryptoMarkets, rawCount, loading, error, nextCursor,
-                    loadMore, detectCategory, formatDate, todayStr
+                    validMarkets, scannedCount, loading, error, 
+                    loadMore, initSearch, detectCoin, formatDate, nowStr
                 };
             }
         }).mount('#app');
