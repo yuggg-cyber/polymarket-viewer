@@ -3,15 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Polymarket 预测盘浏览器 (Demo)</title>
-    <!-- 引入 Tailwind CSS 用于样式 -->
+    <title>Polymarket 预测盘 (CLOB版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 Vue 3 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <!-- 引入 Axios 用于发送请求 -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
-        /* 自定义滚动条样式 */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #1e293b; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
@@ -26,78 +22,67 @@
 <body class="bg-slate-900 text-gray-100 min-h-screen">
 
     <div id="app" class="container mx-auto px-4 py-8">
-        <!-- 头部 -->
-        <header class="mb-8 flex flex-col md:flex-row justify-between items-center gap-4">
-            <div>
-                <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-                    Polymarket 实时看板
-                </h1>
-                <p class="text-slate-400 text-sm mt-1">纯前端调用 Gamma API | 托管于 GitHub Pages</p>
-            </div>
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
+                Polymarket 探索者
+            </h1>
+            <p class="text-slate-400 text-sm mt-1">数据源：Official CLOB API (REST) | 代理：AllOrigins</p>
             
-            <!-- 简单的状态指示器 -->
-            <div v-if="loading" class="text-blue-400 animate-pulse flex items-center">
-                <svg class="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                加载数据中...
+            <!-- 状态栏 -->
+            <div class="mt-4 h-6">
+                <div v-if="loading" class="text-blue-400 flex items-center text-sm animate-pulse">
+                    <svg class="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    正在从 CLOB API 拉取数据...
+                </div>
+                <div v-else class="text-slate-500 text-sm">
+                    已加载 {{ markets.length }} 个活跃预测盘
+                </div>
             </div>
         </header>
 
         <!-- 错误提示 -->
-        <div v-if="error" class="bg-red-900/50 border border-red-500 text-red-200 p-4 rounded-lg mb-6">
-            {{ error }}
+        <div v-if="error" class="bg-red-900/30 border border-red-500/50 text-red-200 p-4 rounded-lg mb-6 text-sm">
+            <p class="font-bold">出错了：</p>
+            <p>{{ error }}</p>
+            <button @click="fetchMarkets" class="mt-2 px-3 py-1 bg-red-800 hover:bg-red-700 rounded text-xs">重试</button>
         </div>
 
-        <!-- 市场列表网格 -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <div v-for="market in markets" :key="market.id" 
-                 class="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden hover:border-blue-500 transition-all shadow-lg hover:shadow-blue-500/10 flex flex-col">
+        <!-- 列表 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div v-for="market in markets" :key="market.condition_id" 
+                 class="bg-slate-800 border border-slate-700 rounded-xl p-5 hover:border-green-500/50 transition-all shadow-lg flex flex-col h-full">
                 
-                <!-- 图片与标题区域 -->
-                <div class="p-4 flex-grow">
-                    <div class="flex items-start gap-3 mb-3">
-                        <img :src="market.image || 'https://polymarket.com/images/fallback.png'" 
-                             class="w-10 h-10 rounded-full bg-slate-700 object-cover shrink-0" 
-                             @error="handleImageError">
-                        <h3 class="font-semibold text-sm md:text-base leading-snug line-clamp-2" :title="market.question">
-                            {{ market.question }}
-                        </h3>
+                <!-- 图标(随机颜色替代)与标题 -->
+                <div class="flex gap-4 mb-4 flex-grow">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-600 flex-shrink-0 flex items-center justify-center text-xl">
+                        🎲
                     </div>
+                    <h3 class="font-semibold text-gray-100 leading-snug line-clamp-3">
+                        {{ market.question }}
+                    </h3>
                 </div>
 
-                <!-- 数据区域 -->
-                <div class="bg-slate-800/50 border-t border-slate-700 p-4">
-                    <!-- 概率/价格展示 -->
-                    <div class="space-y-2 mb-4">
-                        <div v-for="(outcome, index) in JSON.parse(market.outcomeNames)" :key="index" class="flex justify-between items-center text-sm">
-                            <span class="text-slate-400 truncate pr-2">{{ outcome }}</span>
-                            <span class="font-mono font-bold" 
-                                  :class="getProbColor(JSON.parse(market.outcomePrices)[index])">
-                                {{ (parseFloat(JSON.parse(market.outcomePrices)[index]) * 100).toFixed(1) }}%
-                            </span>
-                        </div>
+                <!-- 底部信息 -->
+                <div class="pt-4 border-t border-slate-700/50 flex justify-between items-center text-xs">
+                    <!-- CLOB API 不直接返回图片和24h交易量，我们显示基础信息 -->
+                    <div class="text-slate-400">
+                        <span v-if="market.active" class="text-green-400 mr-2">● 进行中</span>
+                        <span v-else class="text-red-400 mr-2">● 已结束</span>
                     </div>
-
-                    <!-- 底部元数据 -->
-                    <div class="flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-slate-700/50">
-                        <span>🔥 24h Vol: ${{ formatMoney(market.volume24h) }}</span>
-                        <a :href="'https://polymarket.com/event/' + market.slug" 
-                           target="_blank" 
-                           class="text-blue-400 hover:text-blue-300 hover:underline">
-                            去官网交易 &rarr;
-                        </a>
-                    </div>
+                    
+                    <a :href="'https://polymarket.com/event/' + market.market_slug" 
+                       target="_blank"
+                       class="text-blue-400 hover:text-blue-300 font-medium">
+                        查看详情 &rarr;
+                    </a>
                 </div>
             </div>
         </div>
-
-        <!-- 加载更多按钮 -->
-        <div class="text-center mt-10 mb-10" v-if="markets.length > 0">
-            <button @click="loadMore" 
-                    :disabled="loading"
-                    class="px-8 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-full font-medium transition-colors shadow-lg shadow-blue-600/20">
+        
+         <!-- 翻页/加载更多 -->
+         <div class="text-center mt-8 pb-8">
+            <button @click="loadMore" v-if="nextCursor" :disabled="loading"
+                class="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-full text-sm transition-colors disabled:opacity-50">
                 {{ loading ? '加载中...' : '加载更多' }}
             </button>
         </div>
@@ -111,86 +96,55 @@
                 const markets = ref([]);
                 const loading = ref(false);
                 const error = ref(null);
-                const offset = ref(0);
-                const limit = 12; // 每次加载的数量
+                const nextCursor = ref(null); // 用于翻页
 
-                // GraphQL 查询语句
-                // 我们按 24小时交易量倒序，只显示活跃的、未关闭的盘口
-                const QUERY = `
-                    query GetMarkets($limit: Int, $offset: Int) {
-                        markets(
-                            limit: $limit, 
-                            offset: $offset, 
-                            where: { closed: false, active: true, volume24h_gt: 1000 }, 
-                            order: volume24h_DESC
-                        ) {
-                            id
-                            question
-                            slug
-                            outcomePrices
-                            outcomeNames
-                            volume24h
-                            image
-                        }
-                    }
-                `;
-
+                // 核心函数：使用 CLOB API + AllOrigins 代理
                 const fetchMarkets = async (isLoadMore = false) => {
                     if (loading.value) return;
                     loading.value = true;
                     error.value = null;
 
                     try {
-                        // Polymarket Gamma API 端点
-                        const endpoint = 'https://corsproxy.io/?' + encodeURIComponent('https://gamma-api.polymarket.com/query');
+                        // 1. 构造 Polymarket CLOB API 地址
+                        // limit: 每次获取20条
+                        // active: true 只看活跃的
+                        let apiUrl = `https://clob.polymarket.com/markets?active=true&limit=20`;
                         
-                        const response = await axios.post(endpoint, {
-                            query: QUERY,
-                            variables: {
-                                limit: limit,
-                                offset: offset.value
+                        // 如果是翻页，加上 cursor 参数
+                        if (isLoadMore && nextCursor.value) {
+                            apiUrl += `&next_cursor=${nextCursor.value}`;
+                        }
+
+                        // 2. 使用 AllOrigins 代理 (专门处理 GET 请求跨域)
+                        // 我们加上 &t=时间戳 防止缓存
+                        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}&t=${new Date().getTime()}`;
+
+                        // 3. 发送 GET 请求
+                        const response = await axios.get(proxyUrl);
+
+                        // 4. 处理数据 (CLOB API 的结构与 Gamma API 不同)
+                        // CLOB 返回格式: { data: [...], next_cursor: "..." }
+                        const resultData = response.data;
+                        
+                        if (Array.isArray(resultData.data)) {
+                            if (isLoadMore) {
+                                markets.value = [...markets.value, ...resultData.data];
+                            } else {
+                                markets.value = resultData.data;
                             }
-                        });
-
-                        if (response.data.errors) {
-                            throw new Error(response.data.errors[0].message);
+                            // 更新翻页游标
+                            nextCursor.value = resultData.next_cursor || null;
+                        } else if (Array.isArray(resultData)) {
+                            // 兼容某些旧格式返回
+                            markets.value = resultData;
                         }
-
-                        const newMarkets = response.data.data.markets;
-                        
-                        if (isLoadMore) {
-                            markets.value = [...markets.value, ...newMarkets];
-                        } else {
-                            markets.value = newMarkets;
-                        }
-                        
-                        offset.value += limit;
 
                     } catch (err) {
-                        console.error(err);
-                        error.value = "加载数据失败。可能是网络问题或 API 限制，请稍后刷新重试。";
+                        console.error("请求失败详情:", err);
+                        error.value = "无法连接到数据源。请检查网络，或稍后刷新重试。(" + err.message + ")";
                     } finally {
                         loading.value = false;
                     }
-                };
-
-                // 格式化金额 (e.g. 1,234,567)
-                const formatMoney = (value) => {
-                    if (!value) return '0';
-                    return parseInt(value).toLocaleString('en-US');
-                };
-
-                // 简单的概率颜色区分
-                const getProbColor = (prob) => {
-                    const p = parseFloat(prob);
-                    if (p > 0.7) return 'text-green-400';
-                    if (p < 0.3) return 'text-red-400';
-                    return 'text-blue-300';
-                };
-
-                // 处理图片加载失败
-                const handleImageError = (e) => {
-                    e.target.src = "https://polymarket.com/images/fallback.png";
                 };
 
                 const loadMore = () => {
@@ -205,10 +159,9 @@
                     markets,
                     loading,
                     error,
-                    loadMore,
-                    formatMoney,
-                    getProbColor,
-                    handleImageError
+                    nextCursor,
+                    fetchMarkets,
+                    loadMore
                 };
             }
         }).mount('#app');
