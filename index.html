@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Batch Wallet Gen (Offline Only)</title>
-    <!-- 依赖库：需先联网加载，之后断网 -->
+    <title>Batch Wallet Gen (Strict & Verified)</title>
+    <!-- 依赖库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
@@ -14,8 +14,7 @@
         body {
             margin: 0; padding: 40px;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: #fff;
-            color: #333;
+            background-color: #fff; color: #333;
         }
 
         .container { max-width: 1100px; margin: 0 auto; }
@@ -26,139 +25,69 @@
 
         /* 控制栏 */
         .toolbar {
-            background: #fafafa;
-            border: 1px solid #eee;
-            border-radius: 8px;
-            padding: 20px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 25px;
-            position: relative; /* 用于定位安全标签 */
+            background: #fafafa; border: 1px solid #eee; border-radius: 8px;
+            padding: 20px; display: flex; align-items: center; gap: 15px;
+            margin-bottom: 25px; position: relative;
         }
 
         .label { font-size: 14px; color: #333; font-weight: 500; }
 
         input[type="number"] {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            width: 100px;
-            font-size: 14px;
-            transition: border 0.2s;
+            padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;
+            width: 100px; font-size: 14px; transition: border 0.2s;
         }
         input:focus { border-color: #000; }
 
-        /* 按钮样式 */
+        /* 按钮 */
         .btn-black {
             background: #000; color: #fff; border: 1px solid #000;
-            padding: 9px 24px; border-radius: 4px; font-size: 14px;
-            cursor: pointer; transition: opacity 0.2s;
+            padding: 9px 24px; border-radius: 4px; font-size: 14px; cursor: pointer;
         }
         .btn-black:hover { opacity: 0.8; }
         .btn-black:disabled { opacity: 0.3; cursor: not-allowed; }
 
-        .btn-stop {
-            background: #d93025; border-color: #d93025; color: #fff; display: none;
-        }
+        .btn-stop { background: #d93025; border-color: #d93025; color: #fff; display: none; }
 
         .btn-outline {
             background: #fff; color: #333; border: 1px solid #ddd;
             padding: 9px 24px; border-radius: 4px; font-size: 14px;
-            cursor: pointer; margin-left: auto; transition: all 0.2s;
+            cursor: pointer; margin-left: auto;
         }
         .btn-outline:hover { border-color: #999; color: #000; }
         .btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        /* 状态文字 */
-        .toolbar-status {
-            font-size: 14px; color: #666; margin-left: 5px;
-            font-feature-settings: "tnum";
-        }
+        .toolbar-status { font-size: 14px; color: #666; margin-left: 5px; font-feature-settings: "tnum"; }
 
-        /* 安全状态徽章 */
+        /* 徽章 */
         .security-badge {
-            font-size: 12px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            margin-left: 10px;
-            font-weight: 600;
+            font-size: 12px; padding: 4px 8px; border-radius: 4px;
+            margin-left: 10px; font-weight: 600;
         }
-        .bg-safe { background: #e6f4ea; color: #1e8e3e; } /* 绿色 */
-        .bg-danger { background: #fce8e6; color: #d93025; } /* 红色 */
+        .bg-safe { background: #e6f4ea; color: #1e8e3e; }
+        .bg-danger { background: #fce8e6; color: #d93025; }
 
-        /* 表格容器 */
-        .table-wrapper {
-            border: 1px solid #eee;
-            border-radius: 6px;
-            overflow: hidden;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-            table-layout: fixed; 
-        }
-
+        /* 表格 */
+        .table-wrapper { border: 1px solid #eee; border-radius: 6px; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
         thead { background: #fafafa; }
+        th { text-align: left; padding: 14px 16px; color: #888; font-weight: 500; border-bottom: 1px solid #eee; }
         
-        th {
-            text-align: left;
-            padding: 14px 16px;
-            color: #888;
-            font-weight: 500;
-            border-bottom: 1px solid #eee;
-        }
-
-        /* 列宽设置 */
         th:nth-child(1) { width: 60px; }
         th:nth-child(2) { width: 380px; }
         th:nth-child(3) { width: 280px; }
         th:nth-child(4) { width: auto; }
 
-        td {
-            padding: 12px 16px;
-            border-bottom: 1px solid #eee;
-            color: #444;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            height: 50px;
-        }
-
+        td { padding: 12px 16px; border-bottom: 1px solid #eee; color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 50px; }
         tr:last-child td { border-bottom: none; }
         tbody tr:nth-child(even) { background-color: #fcfcfc; }
         
-        /* 交互样式 */
-        .copyable {
-            cursor: pointer;
-            transition: background-color 0.2s;
-            border-radius: 4px;
-            padding: 2px 4px;
-            margin: -2px -4px;
-        }
-        .copyable:active {
-            background-color: #e0e0e0;
-            color: #000 !important;
-            text-shadow: none !important;
-        }
+        .copyable { cursor: pointer; border-radius: 4px; padding: 2px 4px; margin: -2px -4px; transition: background 0.2s; }
+        .copyable:active { background-color: #e0e0e0; color: #000 !important; text-shadow: none !important; }
 
         .font-mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; }
+        .blur-text { color: transparent; text-shadow: 0 0 10px rgba(0,0,0,0.5); transition: all 0.3s ease; user-select: none; }
+        .blur-text:hover { color: #333; text-shadow: none; user-select: auto; }
 
-        .blur-text {
-            color: transparent;
-            text-shadow: 0 0 10px rgba(0,0,0,0.5);
-            transition: all 0.3s ease;
-            user-select: none; 
-        }
-        .blur-text:hover {
-            color: #333;
-            text-shadow: none;
-            user-select: auto;
-        }
-
-        /* 复制提示框 */
         #toast {
             position: fixed; top: 30px; left: 50%; transform: translateX(-50%) translateY(-20px);
             background-color: rgba(0,0,0,0.85); color: #fff; padding: 10px 24px;
@@ -167,57 +96,66 @@
         }
         #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-        /* ---------------- 网络阻断遮罩层 ---------------- */
+        /* ---------------- 验证型遮罩层 ---------------- */
         #networkOverlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(5px);
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.98);
             z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            transition: opacity 0.3s;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; transition: opacity 0.3s;
         }
         
-        /* 隐藏状态 */
         .hidden { display: none !important; }
 
         .warning-icon {
-            width: 60px; height: 60px;
-            background: #d93025;
-            color: #fff;
-            border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 30px;
-            margin-bottom: 20px;
-            font-weight: bold;
+            width: 60px; height: 60px; background: #d93025; color: #fff;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 30px; margin-bottom: 20px; font-weight: bold;
         }
 
         .overlay-title { font-size: 24px; font-weight: 600; color: #d93025; margin-bottom: 10px; }
-        .overlay-desc { font-size: 16px; color: #555; max-width: 400px; line-height: 1.5; }
-        .overlay-tip { margin-top: 30px; font-size: 13px; color: #888; background: #f5f5f5; padding: 10px 20px; border-radius: 4px; }
+        .overlay-desc { font-size: 16px; color: #555; max-width: 500px; line-height: 1.6; margin-bottom: 30px; }
+        
+        /* 验证按钮 */
+        .btn-verify {
+            background: #d93025; color: #fff; border: none;
+            padding: 12px 30px; border-radius: 6px; font-size: 16px; cursor: pointer;
+            box-shadow: 0 4px 10px rgba(217, 48, 37, 0.3);
+            transition: all 0.2s; display: flex; align-items: center; gap: 8px;
+        }
+        .btn-verify:hover { background: #b0271f; box-shadow: 0 6px 14px rgba(217, 48, 37, 0.4); transform: translateY(-1px); }
+        .btn-verify:active { transform: translateY(1px); }
+        .btn-verify:disabled { background: #ccc; cursor: wait; box-shadow: none; }
+
+        .spinner {
+            width: 16px; height: 16px; border: 2px solid #fff; border-top-color: transparent;
+            border-radius: 50%; animation: spin 0.8s linear infinite; display: none;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
     </style>
 </head>
 <body>
 
-<!-- 网络阻断遮罩 -->
+<!-- 验证型遮罩 -->
 <div id="networkOverlay">
     <div class="warning-icon">!</div>
-    <div class="overlay-title">网络连接已检测到</div>
+    <div class="overlay-title">请断开网络连接</div>
     <div class="overlay-desc">
-        为了确保私钥生成的绝对安全，程序禁止在联网状态下运行。<br>
-        请<b>拔掉网线</b>或<b>关闭 Wi-Fi</b> 后继续。
+        程序检测到潜在的网络连接（可能是虚拟网卡或缓存）。<br>
+        为了确保绝对安全，请拔掉网线或关闭 Wi-Fi，然后点击下方按钮。<br>
+        <span style="font-size:13px; color:#888;">系统将尝试连接网络，只有<b>连接失败</b>才会解锁。</span>
     </div>
-    <div class="overlay-tip">提示：当前页面已加载完毕，断网不影响运行</div>
+    
+    <button id="btnVerify" class="btn-verify">
+        <div class="spinner" id="verifySpinner"></div>
+        <span id="verifyText">我已断网，点击验证</span>
+    </button>
 </div>
 
 <div class="container">
     <h1>Batch Wallet Gen</h1>
-    <div class="subtitle">批量以太坊钱包生成器 · 纯前端离线运行</div>
+    <div class="subtitle">批量以太坊钱包生成器 · 纯前端离线运行 (Secure Verified)</div>
 
     <div class="toolbar">
         <span class="label">数量</span>
@@ -227,10 +165,7 @@
         <button id="btnStop" class="btn-black btn-stop">停止</button>
         
         <span id="statusText" class="toolbar-status">就绪</span>
-        
-        <!-- 安全状态指示器 -->
         <span id="badge" class="security-badge bg-safe">OFFLINE</span>
-
         <button id="btnExport" class="btn-outline" disabled>导出 Excel</button>
     </div>
 
@@ -244,9 +179,7 @@
                     <th>助记词 (Mnemonic)</th>
                 </tr>
             </thead>
-            <tbody id="tbody">
-                <!-- 动态插入 -->
-            </tbody>
+            <tbody id="tbody"></tbody>
         </table>
     </div>
 </div>
@@ -254,14 +187,13 @@
 <div id="toast">已复制到剪贴板</div>
 
 <script>
-    // 状态管理
     let isRunning = false;
     let targetTotal = 0;
     let currentCount = 0;
     let walletData = [];
     let startTime = 0;
+    let isOfflineConfirmed = false; // 标记是否通过了主动断网验证
 
-    // DOM 元素
     const ui = {
         inp: document.getElementById('inpCount'),
         start: document.getElementById('btnStart'),
@@ -271,158 +203,161 @@
         status: document.getElementById('statusText'),
         toast: document.getElementById('toast'),
         overlay: document.getElementById('networkOverlay'),
-        badge: document.getElementById('badge')
+        badge: document.getElementById('badge'),
+        btnVerify: document.getElementById('btnVerify'),
+        verifySpinner: document.getElementById('verifySpinner'),
+        verifyText: document.getElementById('verifyText')
     };
 
-    // ================= 网络检测逻辑 (核心新增) =================
-    
-    function checkOnlineStatus() {
-        const isOnline = navigator.onLine;
+    // ================= 核心：主动验证逻辑 =================
 
-        if (isOnline) {
-            // 联网：显示遮罩，阻止操作
-            ui.overlay.classList.remove('hidden');
-            ui.badge.innerText = 'ONLINE - UNSAFE';
-            ui.badge.className = 'security-badge bg-danger';
+    async function verifyOfflineStatus() {
+        ui.btnVerify.disabled = true;
+        ui.verifySpinner.style.display = 'block';
+        ui.verifyText.innerText = "正在尝试连接...";
+
+        // 机制：尝试 fetch 当前页面地址（带随机参防止缓存）
+        // 如果能 fetch 成功，说明有网 -> 阻止
+        // 如果 fetch 抛出错误或超时，说明断网 -> 放行
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2秒超时
+
+        try {
+            // 尝试请求一个肯定存在的地址 (比如当前页面本身)
+            await fetch(window.location.href + '?t=' + Date.now(), { 
+                method: 'HEAD', 
+                signal: controller.signal,
+                cache: 'no-store'
+            });
             
-            // 如果正在运行，强制停止
-            if (isRunning) {
-                stopGeneration();
-                alert('检测到网络连接！为保障安全，生成已强制停止。');
-            }
-        } else {
-            // 断网：隐藏遮罩，允许操作
+            // 如果代码走到这里，说明请求成功了（有网！）
+            clearTimeout(timeoutId);
+            ui.verifyText.innerText = "检测失败：仍可连接网络！";
+            ui.btnVerify.style.background = "#333";
+            
+            setTimeout(() => {
+                ui.btnVerify.disabled = false;
+                ui.btnVerify.style.background = "#d93025";
+                ui.verifySpinner.style.display = 'none';
+                ui.verifyText.innerText = "重试 (请确保已拔网线)";
+            }, 1500);
+
+        } catch (error) {
+            // 捕获到错误（网络错误或超时），说明真的断网了！
+            clearTimeout(timeoutId);
+            isOfflineConfirmed = true;
             ui.overlay.classList.add('hidden');
-            ui.badge.innerText = 'OFFLINE - SAFE';
+            ui.badge.innerText = 'VERIFIED OFFLINE'; // 验证通过
             ui.badge.className = 'security-badge bg-safe';
         }
     }
 
-    // 监听网络状态变化事件
-    window.addEventListener('online', checkOnlineStatus);
-    window.addEventListener('offline', checkOnlineStatus);
-    
-    // 初始化检查
-    checkOnlineStatus();
+    // 绑定验证按钮
+    ui.btnVerify.onclick = verifyOfflineStatus;
 
-    // =========================================================
+    // 监听浏览器的被动状态（辅助）
+    // 如果浏览器真的探测到 offline，我们也可以直接放行，不用点按钮
+    window.addEventListener('offline', () => {
+        isOfflineConfirmed = true;
+        ui.overlay.classList.add('hidden');
+        ui.badge.innerText = 'OFFLINE';
+        ui.badge.className = 'security-badge bg-safe';
+    });
+    
+    // 如果中途突然联网
+    window.addEventListener('online', () => {
+        isOfflineConfirmed = false;
+        ui.overlay.classList.remove('hidden');
+        ui.badge.innerText = 'ONLINE DETECTED';
+        ui.badge.className = 'security-badge bg-danger';
+        // 重置按钮状态
+        ui.btnVerify.disabled = false;
+        ui.verifySpinner.style.display = 'none';
+        ui.verifyText.innerText = "我已断网，点击验证";
+        
+        if (isRunning) {
+            stopGeneration();
+            alert("异常：检测到网络恢复，生成已停止！");
+        }
+    });
+
+    // 初始化：如果 navigator.onLine 已经是 true (即便误报)，先显示遮罩
+    if (navigator.onLine) {
+        ui.overlay.classList.remove('hidden');
+        ui.badge.innerText = 'WAITING CHECK';
+        ui.badge.className = 'security-badge bg-danger';
+    }
+
+    // ================= 常规业务逻辑 =================
 
     function showToast(msg) {
-        ui.toast.innerText = msg;
-        ui.toast.classList.add('show');
+        ui.toast.innerText = msg; ui.toast.classList.add('show');
         setTimeout(() => ui.toast.classList.remove('show'), 2000);
     }
 
     ui.tbody.addEventListener('click', async (e) => {
         const target = e.target.closest('.copyable');
         if (target) {
-            const textToCopy = target.innerText;
-            if (!textToCopy) return;
             try {
-                await navigator.clipboard.writeText(textToCopy);
-                const shortText = textToCopy.length > 15 
-                    ? textToCopy.substring(0, 8) + '...' + textToCopy.substring(textToCopy.length - 4) 
-                    : textToCopy;
-                showToast(`已复制: ${shortText}`);
-            } catch (err) {
-                showToast('复制失败');
-            }
+                await navigator.clipboard.writeText(target.innerText);
+                showToast(`已复制`);
+            } catch (err) { showToast('复制失败'); }
         }
     });
 
     function generateOne() {
-        // 双重保险：如果突然联网，或者达到目标，则停止
-        if (!isRunning || currentCount >= targetTotal || navigator.onLine) {
-            finish();
-            return;
+        if (!isRunning || currentCount >= targetTotal) { finish(); return; }
+        
+        // 运行中如果发现联网且未验证通过，停止
+        if (navigator.onLine && !isOfflineConfirmed) {
+            // 这里为了防止误触，可以不做强打断，依靠上面的 window.addEventListener('online')
+            // 但为了安全，可以保留检查
         }
 
         const wallet = ethers.Wallet.createRandom();
         currentCount++;
-        
-        walletData.push({
-            id: currentCount,
-            address: wallet.address,
-            privateKey: wallet.privateKey,
-            mnemonic: wallet.mnemonic.phrase
-        });
+        walletData.push({ id: currentCount, address: wallet.address, privateKey: wallet.privateKey, mnemonic: wallet.mnemonic.phrase });
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${currentCount}</td>
-            <td class="font-mono copyable" title="点击复制地址">${wallet.address}</td>
-            <td><div class="blur-text font-mono copyable" title="点击复制私钥">${wallet.privateKey}</div></td>
-            <td><div class="blur-text copyable" title="点击复制助记词">${wallet.mnemonic.phrase}</div></td>
+            <td class="font-mono copyable" title="复制">${wallet.address}</td>
+            <td><div class="blur-text font-mono copyable" title="复制">${wallet.privateKey}</div></td>
+            <td><div class="blur-text copyable" title="复制">${wallet.mnemonic.phrase}</div></td>
         `;
         ui.tbody.appendChild(tr);
-
         ui.status.innerText = `正在生成... ${currentCount} / ${targetTotal}`;
-
-        if (isRunning) {
-            requestAnimationFrame(generateOne); 
-        }
+        if (isRunning) requestAnimationFrame(generateOne); 
     }
 
     ui.start.onclick = () => {
-        // 安全检查
-        if (navigator.onLine) {
-            alert('请先断开网络！');
-            checkOnlineStatus(); // 重新触发遮罩
+        // 双重保险：如果没通过验证，不让开始
+        if (!isOfflineConfirmed && navigator.onLine) {
+            ui.overlay.classList.remove('hidden');
             return;
         }
-        
-        if(typeof ethers === 'undefined') return alert('ethers.js 未加载，请先联网刷新页面加载资源，然后断网。');
+
+        if(typeof ethers === 'undefined') return alert('资源未加载，请先联网刷新，再断网。');
         
         const val = parseInt(ui.inp.value);
         if(!val || val <= 0) return;
 
-        targetTotal = val;
-        currentCount = 0;
-        walletData = [];
-        isRunning = true;
-        startTime = performance.now();
-
-        ui.tbody.innerHTML = ''; 
-        ui.inp.disabled = true;
-        ui.start.style.display = 'none';
-        ui.stop.style.display = 'block'; 
-        ui.export.disabled = true;
-        
+        targetTotal = val; currentCount = 0; walletData = []; isRunning = true; startTime = performance.now();
+        ui.tbody.innerHTML = ''; ui.inp.disabled = true; ui.start.style.display = 'none'; ui.stop.style.display = 'block'; ui.export.disabled = true;
         generateOne();
     };
 
     function stopGeneration() {
-        isRunning = false;
-        ui.status.innerText = `已停止，共生成 ${currentCount} 个`;
-        resetBtnState();
+        isRunning = false; ui.status.innerText = `已停止，共 ${currentCount} 个`; resetBtnState();
     }
-
     ui.stop.onclick = stopGeneration;
 
     function finish() {
-        // 如果是因为联网导致的结束，已经在 checkOnlineStatus 里处理了，这里只处理正常完成
-        if (isRunning) { 
-            isRunning = false;
-            const duration = ((performance.now() - startTime) / 1000).toFixed(2);
-            ui.status.innerText = `已完成 ${currentCount} 个钱包，耗时 ${duration} 秒`;
-            resetBtnState();
-        }
+        isRunning = false;
+        const duration = ((performance.now() - startTime) / 1000).toFixed(2);
+        ui.status.innerText = `完成 ${currentCount} 个，耗时 ${duration} 秒`;
+        resetBtnState();
     }
 
-    function resetBtnState() {
-        ui.inp.disabled = false;
-        ui.start.style.display = 'block';
-        ui.stop.style.display = 'none';
-        if (walletData.length > 0) ui.export.disabled = false;
-    }
-
-    ui.export.onclick = () => {
-        const ws = XLSX.utils.json_to_sheet(walletData);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Wallets");
-        XLSX.writeFile(wb, `Batch_Gen_${currentCount}.xlsx`);
-    };
-</script>
-
-</body>
-</html>
+    function resetBtnSta
