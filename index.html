@@ -142,7 +142,7 @@
 
                     try {
                         // Polymarket Gamma API 端点
-                        const endpoint = 'https://gamma-api.polymarket.com/query';
+                        const endpoint = 'https://corsproxy.io/?' + encodeURIComponent('https://gamma-api.polymarket.com/query');
                         
                         const response = await axios.post(endpoint, {
                             query: QUERY,
