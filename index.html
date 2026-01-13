@@ -3,19 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StandX 本地凭证提取工具 v5 (修复引用版)</title>
+    <title>StandX 本地凭证提取工具 v6 (高兼容版)</title>
     
-    <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js" 
-            integrity="sha384-gpR0Q6Hx/O+uevlbpbANbS0LWjbejPV1sqD/8w422l/fW8whGY0EPmKw3uG7ACYP" 
-            crossorigin="anonymous" onerror="libError('ethers')"></script>
-    
-    <script src="https://cdn.jsdelivr.net/npm/@noble/curves@1.4.0/dist/umd/ed25519.js" 
-            integrity="sha384-ifbJ9aZTz8vzfjCQ6LX/dz1h1i2y+8I1uXwETcWZ7PJIyNgxP6vkhvHLBlZbKb3R" 
-            crossorigin="anonymous" onerror="libError('noble-curves')"></script>
-            
-    <script src="https://cdn.jsdelivr.net/npm/@scure/base@1.1.7/dist/index.js" 
-            integrity="sha384-Z692kaNiTbJVnIxJx9WhHS7ZITD2YzByKfkmcM4CGlqPe7R7aYX/8D8bjpQTCOgc" 
-            crossorigin="anonymous" onerror="libError('scure-base')"></script>
+    <!-- 使用 unpkg 提供的 UMD 版本，通常更易于在浏览器全局环境使用 -->
+    <script src="https://unpkg.com/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+    <script src="https://unpkg.com/@noble/curves@1.4.0/dist/umd/ed25519.js"></script>
+    <script src="https://unpkg.com/@scure/base@1.1.7/dist/index.js"></script>
 
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0d1117; color: #c9d1d9; padding: 20px; line-height: 1.6; }
@@ -34,17 +27,12 @@
         .value-container { position: relative; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; word-break: break-all; font-family: monospace; font-size: 14px; }
         .warning { background: rgba(210, 153, 34, 0.1); border: 1px solid #d29922; color: #d29922; padding: 15px; border-radius: 8px; margin-top: 20px; font-size: 13px; }
         #status { text-align: center; margin-top: 10px; font-weight: bold; }
-        .lib-error { color: #f85149; background: rgba(248, 81, 73, 0.1); padding: 10px; border-radius: 6px; margin-bottom: 20px; display: none; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div id="lib-error-box" class="lib-error">
-            ⚠️ <strong>安全警告：</strong> 依赖库加载失败或 SRI 校验未通过！
-        </div>
-
-        <h1>StandX 凭证提取 v5</h1>
-        <p class="desc">本地生成，直接请求官方 API，修复了库引用逻辑</p>
+        <h1>StandX 凭证提取 v6</h1>
+        <p class="desc">本地生成，直接请求官方 API，高兼容性版本</p>
 
         <div class="step">
             <p>第一步：选择并连接钱包</p>
@@ -79,35 +67,38 @@
     </div>
 
     <script>
-        function libError(name) {
-            document.getElementById('lib-error-box').style.display = 'block';
-            console.error(`Library ${name} failed to load.`);
-        }
-
         const status = document.getElementById('status');
         const resultArea = document.getElementById('result-area');
         const API_BASE = "https://api.standx.com/v1/offchain";
 
         async function startExtraction(walletType) {
             try {
-                // 动态获取 ed25519 对象，处理不同的 CDN 导出结构
-                const ed25519 = window.nobleCurves ? window.nobleCurves.ed25519 : (window.nobleEd25519 || window.ed25519);
-                const scureBase = window.scureBase;
+                // 1. 自动探测库对象
+                const ethersLib = window.ethers;
+                
+                // 探测 ed25519
+                let ed25519 = null;
+                if (window.nobleCurves && window.nobleCurves.ed25519) ed25519 = window.nobleCurves.ed25519;
+                else if (window.noble && window.noble.ed25519) ed25519 = window.noble.ed25519;
+                else if (window.ed25519) ed25519 = window.ed25519;
+                
+                // 探测 scureBase
+                let scureBase = window.scureBase;
+                if (!scureBase && window.scure && window.scure.base) scureBase = window.scure.base;
 
-                if (!window.ethers || !ed25519 || !scureBase) {
-                    console.log('Debug - ethers:', !!window.ethers, 'ed25519:', !!ed25519, 'scureBase:', !!scureBase);
-                    throw new Error('依赖库未就绪，请检查控制台或刷新页面。');
-                }
+                if (!ethersLib) throw new Error('未找到 ethers 库');
+                if (!ed25519) throw new Error('未找到 ed25519 库');
+                if (!scureBase) throw new Error('未找到 scureBase 库');
 
                 let provider;
                 if (walletType === 'mm') {
                     if (!window.ethereum) throw new Error('未检测到 MetaMask 钱包');
                     const providers = window.ethereum.providers || [window.ethereum];
                     const mmProvider = providers.find(p => p.isMetaMask) || window.ethereum;
-                    provider = new ethers.BrowserProvider(mmProvider);
+                    provider = new ethersLib.BrowserProvider(mmProvider);
                 } else {
                     if (!window.okxwallet) throw new Error('未检测到 OKX 钱包');
-                    provider = new ethers.BrowserProvider(window.okxwallet);
+                    provider = new ethersLib.BrowserProvider(window.okxwallet);
                 }
 
                 status.innerText = "正在初始化...";
