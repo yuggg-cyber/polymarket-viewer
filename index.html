@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StandX 本地凭证提取工具 (安全版)</title>
+    <title>StandX 本地凭证提取工具 v2 (支持 MetaMask & OKX)</title>
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@noble/curves@1.4.0/dist/umd/ed25519.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@scure/base@1.1.7/dist/index.js"></script>
@@ -13,26 +13,30 @@
         h1 { color: #58a6ff; text-align: center; margin-bottom: 10px; }
         .desc { text-align: center; color: #8b949e; margin-bottom: 30px; font-size: 0.9em; }
         .step { margin-bottom: 20px; padding: 15px; background: #0d1117; border-radius: 8px; border-left: 4px solid #238636; }
-        button { background-color: #238636; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600; width: 100%; transition: background 0.2s; }
-        button:hover { background-color: #2ea043; }
+        .btn-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        button { background-color: #238636; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600; flex: 1; transition: background 0.2s; }
+        button.okx { background-color: #ffffff; color: #000000; }
+        button:hover { opacity: 0.9; }
         button:disabled { background-color: #213322; color: #8b949e; cursor: not-allowed; }
         .result-area { margin-top: 30px; display: none; }
         .field { margin-bottom: 20px; }
         .label { display: block; color: #8b949e; font-size: 12px; margin-bottom: 5px; text-transform: uppercase; }
         .value-container { position: relative; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; word-break: break-all; font-family: monospace; font-size: 14px; }
-        .copy-btn { position: absolute; right: 10px; top: 10px; background: #30363d; font-size: 12px; padding: 4px 8px; width: auto; }
         .warning { background: rgba(210, 153, 34, 0.1); border: 1px solid #d29922; color: #d29922; padding: 15px; border-radius: 8px; margin-top: 20px; font-size: 13px; }
         #status { text-align: center; margin-top: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>StandX 凭证提取</h1>
-        <p class="desc">本地生成，直接请求官方 API，不经过任何第三方服务器</p>
+        <h1>StandX 凭证提取 v2</h1>
+        <p class="desc">本地生成，直接请求官方 API，支持 MetaMask 和 OKX 钱包</p>
 
         <div class="step">
-            <p>第一步：连接钱包并生成代理密钥</p>
-            <button id="btn-start">开始提取 (连接 MetaMask)</button>
+            <p>第一步：选择并连接钱包</p>
+            <div class="btn-group">
+                <button id="btn-mm">连接 MetaMask</button>
+                <button id="btn-okx" class="okx">连接 OKX Wallet</button>
+            </div>
             <div id="status"></div>
         </div>
 
@@ -60,31 +64,37 @@
     </div>
 
     <script>
-        const btnStart = document.getElementById('btn-start');
         const status = document.getElementById('status');
         const resultArea = document.getElementById('result-area');
-        
         const API_BASE = "https://api.standx.com/v1/offchain";
 
-        btnStart.addEventListener('click', async () => {
+        async function startExtraction(walletType) {
             try {
-                if (!window.ethereum) {
-                    alert('请安装 MetaMask 钱包！');
-                    return;
+                let provider;
+                if (walletType === 'mm') {
+                    if (!window.ethereum) throw new Error('未检测到 MetaMask 钱包');
+                    // 确保获取的是 MetaMask 而不是被其他钱包覆盖的 ethereum 对象
+                    const providers = window.ethereum.providers || [window.ethereum];
+                    const mmProvider = providers.find(p => p.isMetaMask) || window.ethereum;
+                    provider = new ethers.BrowserProvider(mmProvider);
+                } else {
+                    if (!window.okxwallet) throw new Error('未检测到 OKX 钱包');
+                    provider = new ethers.BrowserProvider(window.okxwallet);
                 }
 
-                btnStart.disabled = true;
                 status.innerText = "正在初始化...";
                 status.style.color = "#58a6ff";
 
-                // 1. 生成 Ed25519 密钥对
-                const privKeyBytes = nobleEd25519.utils.randomSecretKey();
-                const pubKeyBytes = await nobleEd25519.getPublicKey(privKeyBytes);
+                // 1. 生成 Ed25519 密钥对 (修复库引用)
+                const ed25519 = window.nobleEd25519;
+                const scureBase = window.scureBase;
+                
+                const privKeyBytes = ed25519.utils.randomSecretKey();
+                const pubKeyBytes = await ed25519.getPublicKey(privKeyBytes);
                 const privKeyHex = Array.from(privKeyBytes).map(b => b.toString(16).padStart(2, '0')).join('');
                 const requestId = scureBase.base58.encode(pubKeyBytes);
 
                 // 2. 获取钱包地址
-                const provider = new ethers.BrowserProvider(window.ethereum);
                 const signer = await provider.getSigner();
                 const address = await signer.getAddress();
                 
@@ -100,7 +110,6 @@
                 if (!prepData.success) throw new Error("准备登录失败: " + JSON.stringify(prepData));
 
                 const signedData = prepData.signedData;
-                // 解码 JWT 获取 message (简单处理，实际生产应验证)
                 const payload = JSON.parse(atob(signedData.split('.')[1]));
                 const message = payload.message;
 
@@ -133,9 +142,11 @@
                 console.error(err);
                 status.innerText = "❌ 错误: " + err.message;
                 status.style.color = "#f85149";
-                btnStart.disabled = false;
             }
-        });
+        }
+
+        document.getElementById('btn-mm').onclick = () => startExtraction('mm');
+        document.getElementById('btn-okx').onclick = () => startExtraction('okx');
     </script>
 </body>
 </html>
