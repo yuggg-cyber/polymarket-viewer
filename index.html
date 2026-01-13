@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StandX 本地凭证提取工具 v7 (内置算法版)</title>
+    <title>StandX 本地凭证提取工具 v8 (专业版)</title>
     
-    <!-- 仅保留最稳定的 ethers 库用于钱包通信 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js"></script>
 
     <style>
@@ -20,17 +19,20 @@
         button:hover { opacity: 0.9; }
         button:disabled { background-color: #213322; color: #8b949e; cursor: not-allowed; }
         .result-area { margin-top: 30px; display: none; }
-        .field { margin-bottom: 20px; }
+        .field { margin-bottom: 20px; position: relative; }
         .label { display: block; color: #8b949e; font-size: 12px; margin-bottom: 5px; text-transform: uppercase; }
-        .value-container { position: relative; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; word-break: break-all; font-family: monospace; font-size: 14px; }
+        .value-container { position: relative; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; padding-right: 80px; word-break: break-all; font-family: monospace; font-size: 14px; min-height: 20px; }
+        .copy-btn { position: absolute; right: 10px; top: 30px; background: #30363d; color: #c9d1d9; font-size: 11px; padding: 4px 8px; border-radius: 4px; cursor: pointer; border: 1px solid #444c56; }
+        .copy-btn:hover { background: #444c56; }
         .warning { background: rgba(210, 153, 34, 0.1); border: 1px solid #d29922; color: #d29922; padding: 15px; border-radius: 8px; margin-top: 20px; font-size: 13px; }
         #status { text-align: center; margin-top: 10px; font-weight: bold; }
+        .copy-all { margin-top: 20px; background: #1f6feb; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>StandX 凭证提取 v7</h1>
-        <p class="desc">本地生成，内置 Ed25519 算法，无需外部加密库</p>
+        <h1>StandX 凭证提取 v8</h1>
+        <p class="desc">本地生成，支持 MetaMask/OKX 独立连接，带复制功能</p>
 
         <div class="step">
             <p>第一步：选择并连接钱包</p>
@@ -47,6 +49,7 @@
                 <div class="label" style="text-transform: none;">STANDX_REQUEST_PRIVATE_KEY</div>
                 <div class="value-container">
                     <span id="res-privkey"></span>
+                    <div class="copy-btn" onclick="copyText('res-privkey')">复制</div>
                 </div>
             </div>
 
@@ -55,8 +58,20 @@
                 <div class="label" style="text-transform: none;">STANDX_TOKEN</div>
                 <div class="value-container">
                     <span id="res-token"></span>
+                    <div class="copy-btn" onclick="copyText('res-token')">复制</div>
                 </div>
             </div>
+
+            <div class="field">
+                <span class="label">令牌过期时间 / TOKEN EXPIRY (7 DAYS)</span>
+                <div class="label" style="text-transform: none;">STANDX_TOKEN_EXPIRY</div>
+                <div class="value-container">
+                    <span id="res-expiry"></span>
+                    <div class="copy-btn" onclick="copyText('res-expiry')">复制</div>
+                </div>
+            </div>
+
+            <button class="copy-all" onclick="copyAll()">复制全部 (用于 .env)</button>
 
             <div class="warning">
                 <strong>安全提示：</strong> 这些凭证允许完全访问您的 StandX 账户交易权限。请仅在受信任的环境中使用。
@@ -88,25 +103,28 @@
             return digits.reverse().map(d => ALPHABET[d]).join('');
         }
 
-        // --- 使用 Web Crypto API 生成 Ed25519 密钥对 ---
-        // 现代浏览器原生支持生成 Ed25519 密钥，无需外部库
         async function generateEd25519() {
-            const keyPair = await window.crypto.subtle.generateKey(
-                { name: "Ed25519" },
-                true,
-                ["sign", "verify"]
-            );
+            const keyPair = await window.crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
             const privRaw = await window.crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
             const pubRaw = await window.crypto.subtle.exportKey("raw", keyPair.publicKey);
-            
-            // 提取私钥原始字节 (PKCS8 格式中最后 32 字节通常是私钥)
             const privBytes = new Uint8Array(privRaw).slice(-32);
             const pubBytes = new Uint8Array(pubRaw);
-            
             const privHex = Array.from(privBytes).map(b => b.toString(16).padStart(2, '0')).join('');
             const requestId = encodeBase58(pubBytes);
-            
             return { privHex, requestId };
+        }
+
+        function copyText(id) {
+            const text = document.getElementById(id).innerText;
+            navigator.clipboard.writeText(text).then(() => alert('已复制到剪贴板'));
+        }
+
+        function copyAll() {
+            const priv = document.getElementById('res-privkey').innerText;
+            const token = document.getElementById('res-token').innerText;
+            const expiry = document.getElementById('res-expiry').innerText;
+            const all = `STANDX_REQUEST_PRIVATE_KEY=${priv}\nSTANDX_TOKEN=${token}\nSTANDX_TOKEN_EXPIRY=${expiry}`;
+            navigator.clipboard.writeText(all).then(() => alert('已复制全部配置'));
         }
 
         const status = document.getElementById('status');
@@ -115,37 +133,34 @@
 
         async function startExtraction(walletType) {
             try {
-                if (!window.ethers) throw new Error('ethers 库加载失败，请检查网络。');
-
-                let provider;
+                let ethProvider;
                 if (walletType === 'mm') {
-                    if (!window.ethereum) throw new Error('未检测到 MetaMask 钱包');
+                    if (!window.ethereum) throw new Error('未检测到 MetaMask');
+                    // 寻找真正的 MetaMask 实例
                     const providers = window.ethereum.providers || [window.ethereum];
-                    const mmProvider = providers.find(p => p.isMetaMask) || window.ethereum;
-                    provider = new ethers.BrowserProvider(mmProvider);
+                    ethProvider = providers.find(p => p.isMetaMask);
+                    if (!ethProvider) ethProvider = window.ethereum;
                 } else {
-                    if (!window.okxwallet) throw new Error('未检测到 OKX 钱包');
-                    provider = new ethers.BrowserProvider(window.okxwallet);
+                    if (!window.okxwallet) throw new Error('未检测到 OKX Wallet');
+                    ethProvider = window.okxwallet;
                 }
 
+                const provider = new ethers.BrowserProvider(ethProvider);
                 status.innerText = "正在生成本地密钥...";
                 status.style.color = "#58a6ff";
 
-                // 使用浏览器原生 Web Crypto API 生成密钥
                 const { privHex, requestId } = await generateEd25519();
-
                 const signer = await provider.getSigner();
                 const address = await signer.getAddress();
                 
                 status.innerText = "正在请求签名数据...";
-
                 const prepRes = await fetch(`${API_BASE}/prepare-signin?chain=bsc`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ address, requestId })
                 });
                 const prepData = await prepRes.json();
-                if (!prepData.success) throw new Error("准备登录失败: " + JSON.stringify(prepData));
+                if (!prepData.success) throw new Error("准备登录失败");
 
                 const signedData = prepData.signedData;
                 const payload = JSON.parse(atob(signedData.split('.')[1]));
@@ -163,17 +178,20 @@
                 const loginData = await loginRes.json();
                 
                 if (loginData.token) {
+                    const now = Math.floor(Date.now() / 1000);
+                    const expiry = now + 604800; // 7天后
+
                     document.getElementById('res-privkey').innerText = privHex;
                     document.getElementById('res-token').innerText = loginData.token;
+                    document.getElementById('res-expiry').innerText = expiry;
+                    
                     resultArea.style.display = 'block';
                     status.innerText = "✅ 提取成功！";
                     status.style.color = "#238636";
                 } else {
-                    throw new Error("登录失败，未获取到 Token");
+                    throw new Error("登录失败");
                 }
-
             } catch (err) {
-                console.error(err);
                 status.innerText = "❌ 错误: " + err.message;
                 status.style.color = "#f85149";
             }
