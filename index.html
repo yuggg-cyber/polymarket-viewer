@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StandX Auth v4.2</title>
+    <title>StandX Auth</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tweetnacl/1.0.3/nacl.min.js"></script>
     
     <style>
-        /* --- 极简深色系设计 --- */
         :root {
             --bg-color: #09090b;       
             --card-bg: #18181b;        
@@ -43,7 +42,6 @@
         h2 { font-weight: 700; font-size: 28px; margin: 0 0 10px 0; letter-spacing: -0.5px; }
         .subtitle { font-size: 15px; color: var(--text-muted); }
 
-        /* 状态条 */
         .status-badge {
             display: flex; align-items: center; justify-content: center;
             background: rgba(255,255,255,0.03);
@@ -56,9 +54,8 @@
         .status-badge.active { background: rgba(16, 185, 129, 0.1); color: var(--accent-success); border-color: rgba(16, 185, 129, 0.3); }
         .status-badge.error { background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
 
-        /* --- 修复点：移除了多余的 display: flex --- */
         .wallet-info {
-            display: none; /* 默认必须隐藏 */
+            display: none;
             background: #27272a; border-radius: 12px;
             padding: 14px 20px; margin-bottom: 30px; border: 1px solid #52525b;
             justify-content: space-between; align-items: center;
@@ -107,7 +104,7 @@
 <div class="card">
     <header>
         <h2>StandX Authorization</h2>
-        <div class="subtitle">安全隔离 · 本地生成 · 极简配置</div>
+        <div class="subtitle">安全隔离 · 本地生成 · 一键鉴权</div>
     </header>
 
     <div id="status-bar" class="status-badge">准备就绪，请选择钱包连接</div>
@@ -120,7 +117,7 @@
     </div>
 
     <div class="btn-grid">
-        <button id="btn-mm" class="btn btn-mm" onclick="runProcess('metamask')"><span>🦊 MetaMask</span></button>
+        <button id="btn-mm" class="btn btn-mm" onclick="runProcess('metamask')"><span>MetaMask</span></button>
         <button id="btn-okx" class="btn btn-okx" onclick="runProcess('okx')"><span>OKX Wallet</span></button>
     </div>
 
@@ -219,7 +216,6 @@
         document.getElementById('btn-okx').disabled = disabled;
     }
     
-    // UI 重置函数：当出错时隐藏已连接栏
     function resetWalletUI() {
         document.getElementById('wallet-display').style.display = 'none';
         document.getElementById('result-area').style.display = 'none';
@@ -243,7 +239,6 @@
 
     async function runProcess(walletType) {
         toggleUI(true);
-        // 开始时先重置界面，防止显示旧数据
         resetWalletUI();
         
         setStatus("正在呼叫钱包，请稍候...", "normal");
@@ -272,7 +267,6 @@
             const signer = await provider.getSigner();
             const address = await signer.getAddress();
 
-            // --- 只有到了这一步，才显示“已连接”栏 ---
             document.getElementById('wallet-addr-text').innerText = address;
             document.getElementById('wallet-display').style.display = 'flex';
             
@@ -337,7 +331,6 @@
         } catch (err) {
             console.error(err);
             
-            // --- 出错后，隐藏已连接栏，回到初始状态 ---
             resetWalletUI();
 
             let displayMsg = err.message;
@@ -349,7 +342,7 @@
                 displayMsg = "操作失败: " + displayMsg.substring(0, 40) + "... (请查看控制台)";
             }
 
-            setStatus("❌ " + displayMsg, "error");
+            setStatus(" " + displayMsg, "error");
         } finally {
             toggleUI(false);
         }
