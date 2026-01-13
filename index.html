@@ -3,58 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StandX 授权工具 v2.0 (多钱包版)</title>
-    <!-- 引入 Ethers.js -->
+    <title>StandX 授权工具 v2.1 (防冲突版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js"></script>
-    <!-- 引入 TweetNaCl -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tweetnacl/1.0.3/nacl.min.js"></script>
     
     <style>
         :root { --bg: #0f111a; --card: #1e2330; --primary: #3b82f6; --text: #e2e8f0; --muted: #94a3b8; --border: #2d3748; }
-        body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; padding-top: 40px; margin: 0; }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; padding-top: 40px; margin: 0; }
         .container { background-color: var(--card); width: 100%; max-width: 600px; padding: 30px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid var(--border); }
         h2 { text-align: center; margin-top: 0; color: #fff; margin-bottom: 25px; }
         
-        /* 状态栏 & 地址显示 */
         .status-box { background: #13161c; border: 1px solid #334155; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 13px; color: var(--muted); margin-bottom: 20px; text-align: center; }
         .address-box { display: none; background: rgba(59, 130, 246, 0.1); border: 1px solid var(--primary); color: #60a5fa; padding: 12px; border-radius: 8px; margin-bottom: 20px; text-align: center; font-weight: bold; font-family: monospace; font-size: 15px; }
 
-        /* 按钮组 */
         .btn-group { display: flex; gap: 15px; margin-bottom: 20px; }
         .btn { flex: 1; padding: 14px; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
         
-        /* 针对不同钱包的按钮样式 */
-        .btn-mm { background-color: #f6851b; color: #fff; } /* MetaMask Orange */
+        .btn-mm { background-color: #f6851b; color: #fff; } 
         .btn-mm:hover { background-color: #e2761b; }
-        .btn-okx { background-color: #ffffff; color: #000000; } /* OKX White */
+        .btn-okx { background-color: #ffffff; color: #000000; } 
         .btn-okx:hover { background-color: #f0f0f0; }
-        
         .btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(100%); }
 
-        /* 结果区域 */
         .result-group { margin-top: 25px; display: none; border-top: 1px solid var(--border); padding-top: 20px; }
         .field-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: flex; justify-content: space-between; }
         .field-box { background: #0f111a; border: 1px solid var(--border); color: #a5b4fc; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 14px; word-break: break-all; margin-bottom: 15px; }
         .copy-tag { font-size: 11px; color: var(--primary); cursor: pointer; text-decoration: underline; }
-        
         .btn-copy-all { width: 100%; background-color: #10b981; color: white; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; }
-        .btn-copy-all:hover { background-color: #059669; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>StandX 授权工具 v2.0</h2>
+    <h2>StandX 授权工具 v2.1</h2>
     
-    <!-- 状态显示区域 -->
     <div id="status" class="status-box">请选择钱包进行连接</div>
     
-    <!-- 成功连接后显示地址的区域 -->
     <div id="connected-wallet" class="address-box">
         当前地址: <span id="wallet-addr-text"></span>
     </div>
 
-    <!-- 钱包选择按钮 -->
     <div class="btn-group">
         <button id="btn-mm" class="btn btn-mm" onclick="runProcess('metamask')">
             🦊 连接 MetaMask
@@ -64,7 +52,6 @@
         </button>
     </div>
 
-    <!-- 结果输出区域 -->
     <div id="results" class="result-group">
         <div class="field-label">
             <span>请求私钥 (STANDX_REQUEST_PRIVATE_KEY)</span>
@@ -88,10 +75,8 @@
 </div>
 
 <script>
-    // 配置 API 地址
     const API_URL = "https://api.standx.com/v1/offchain";
 
-    // 工具函数：Base58 编码
     const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     function toBase58(buffer) {
         const bytes = new Uint8Array(buffer);
@@ -124,62 +109,76 @@
         el.style.color = type === 'error' ? '#f87171' : (type === 'success' ? '#4ade80' : '#94a3b8');
     }
 
-    // 禁用/启用按钮
     function toggleButtons(disabled) {
         document.getElementById('btn-mm').disabled = disabled;
         document.getElementById('btn-okx').disabled = disabled;
     }
 
+    // --- 核心：更强力的钱包检测逻辑 ---
+    function getProvider(walletType) {
+        if (walletType === 'okx') {
+            // 找 OKX
+            if (window.okxwallet) return window.okxwallet;
+            if (window.ethereum && (window.ethereum.isOkxWallet || window.ethereum.isOKExWallet)) return window.ethereum;
+            return null;
+        } else {
+            // 找 MetaMask (最难的部分)
+            if (!window.ethereum) return null;
+
+            // 1. 如果存在 providers 数组 (EIP-6963)，从中筛选出纯正的 MetaMask
+            if (window.ethereum.providers) {
+                const realMM = window.ethereum.providers.find(p => p.isMetaMask && !p.isOkxWallet && !p.isOKExWallet && !p.isBitKeep);
+                if (realMM) return realMM;
+            }
+
+            // 2. 如果没有数组，检查当前的 window.ethereum 是不是被劫持了
+            if (window.ethereum.isOkxWallet || window.ethereum.isOKExWallet) {
+                // 当前是 OKX，但用户想要 MetaMask。
+                // 此时没办法通过代码强制调出 MetaMask，必须弹窗提示
+                return 'HIJACKED_BY_OKX'; 
+            }
+
+            // 3. 默认情况，假设它是 MetaMask
+            return window.ethereum;
+        }
+    }
+
     async function runProcess(walletType) {
         toggleButtons(true);
         try {
-            // 1. 选择钱包 Provider
-            let providerObj;
-            
-            if (walletType === 'okx') {
-                if (typeof window.okxwallet !== 'undefined') {
-                    providerObj = window.okxwallet;
-                } else {
-                    throw new Error("未检测到 OKX 钱包插件，请先安装或解锁。");
-                }
-            } else {
-                // 默认为 MetaMask / window.ethereum
-                if (typeof window.ethereum !== 'undefined') {
-                    // 如果装了多个钱包，尝试寻找 isMetaMask 标记
-                    if (window.ethereum.providers) {
-                        providerObj = window.ethereum.providers.find(p => p.isMetaMask) || window.ethereum;
-                    } else {
-                        providerObj = window.ethereum;
-                    }
-                } else {
-                    throw new Error("未检测到 MetaMask 钱包插件。");
-                }
+            // 1. 获取 Provider
+            const providerObj = getProvider(walletType);
+
+            if (!providerObj) {
+                throw new Error(walletType === 'okx' ? "未检测到 OKX 钱包" : "未检测到 MetaMask");
+            }
+
+            if (providerObj === 'HIJACKED_BY_OKX') {
+                alert("⚠️ 检测到 OKX 钱包抢占了连接通道。\n\n请在 OKX 插件设置中关闭 [自定义拦截] 或 [连接兼容钱包]，或者在浏览器扩展管理中暂时关闭 OKX 插件，刷新页面重试。");
+                toggleButtons(false);
+                setStatus("连接被 OKX 拦截，请调整设置", "error");
+                return;
             }
 
             const provider = new ethers.BrowserProvider(providerObj);
             
             setStatus(`正在连接 ${walletType === 'okx' ? 'OKX Wallet' : 'MetaMask'}...`);
-            
-            // 请求连接
             await provider.send("eth_requestAccounts", []);
             const signer = await provider.getSigner();
             const address = await signer.getAddress();
 
-            // 2. 显示当前地址 (UI更新)
+            // 2. 显示地址
             document.getElementById('wallet-addr-text').innerText = address;
             document.getElementById('connected-wallet').style.display = 'block';
-            setStatus("连接成功！正在生成本地安全密钥...");
+            setStatus("连接成功！正在生成密钥...");
 
-            // 3. 本地生成 Ed25519 密钥
+            // 3. 密钥生成
             const keyPair = nacl.sign.keyPair(); 
             const privKeyHex = toHex(keyPair.secretKey).slice(0, 64);
             const pubKeyBytes = keyPair.publicKey;
             const requestId = toBase58(pubKeyBytes);
 
-            console.log("Generated RequestId:", requestId);
-
-            // 4. API 交互: 注册公钥
-            setStatus("正在请求服务器验证...");
+            // 4. 注册
             const prepResp = await fetch(`${API_URL}/prepare-signin?chain=bsc`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -191,31 +190,29 @@
                 throw new Error("服务器拒绝: " + (prepData.message || "未知原因"));
             }
 
-            // 5. 钱包签名
+            // 5. 签名
             const payloadPart = prepData.signedData.split('.')[1];
             const payload = JSON.parse(atob(payloadPart));
             const messageToSign = payload.message;
 
-            setStatus("请在钱包中确认签名...");
+            setStatus("请在钱包中签名...");
             const signature = await signer.signMessage(messageToSign);
 
-            // 6. 换取 Token
-            setStatus("正在获取最终凭证...");
+            // 6. 登录
+            setStatus("正在获取 Token...");
             const loginResp = await fetch(`${API_URL}/login?chain=bsc`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     signature: signature,
                     signedData: prepData.signedData,
-                    expiresSeconds: 604800 // 7天
+                    expiresSeconds: 604800
                 })
             });
             const loginData = await loginResp.json();
 
             if (loginData.token) {
-                // 成功显示
                 const expiryTime = Math.floor(Date.now() / 1000) + 604800;
-                
                 document.getElementById('out-priv').innerText = privKeyHex;
                 document.getElementById('out-token').innerText = loginData.token;
                 document.getElementById('out-expiry').innerText = expiryTime;
@@ -228,7 +225,7 @@
 
         } catch (err) {
             console.error(err);
-            setStatus("❌ 错误: " + err.message, "error");
+            setStatus("❌ " + err.message, "error");
         } finally {
             toggleButtons(false);
         }
