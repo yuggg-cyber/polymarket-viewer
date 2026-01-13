@@ -3,10 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StandX 本地凭证提取工具 v2 (支持 MetaMask & OKX)</title>
-    <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@noble/curves@1.4.0/dist/umd/ed25519.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@scure/base@1.1.7/dist/index.js"></script>
+    <title>StandX 本地凭证提取工具 v5 (修复引用版)</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js" 
+            integrity="sha384-gpR0Q6Hx/O+uevlbpbANbS0LWjbejPV1sqD/8w422l/fW8whGY0EPmKw3uG7ACYP" 
+            crossorigin="anonymous" onerror="libError('ethers')"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@noble/curves@1.4.0/dist/umd/ed25519.js" 
+            integrity="sha384-ifbJ9aZTz8vzfjCQ6LX/dz1h1i2y+8I1uXwETcWZ7PJIyNgxP6vkhvHLBlZbKb3R" 
+            crossorigin="anonymous" onerror="libError('noble-curves')"></script>
+            
+    <script src="https://cdn.jsdelivr.net/npm/@scure/base@1.1.7/dist/index.js" 
+            integrity="sha384-Z692kaNiTbJVnIxJx9WhHS7ZITD2YzByKfkmcM4CGlqPe7R7aYX/8D8bjpQTCOgc" 
+            crossorigin="anonymous" onerror="libError('scure-base')"></script>
+
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0d1117; color: #c9d1d9; padding: 20px; line-height: 1.6; }
         .container { max-width: 800px; margin: 0 auto; background: #161b22; padding: 30px; border-radius: 12px; border: 1px solid #30363d; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
@@ -24,12 +34,17 @@
         .value-container { position: relative; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; word-break: break-all; font-family: monospace; font-size: 14px; }
         .warning { background: rgba(210, 153, 34, 0.1); border: 1px solid #d29922; color: #d29922; padding: 15px; border-radius: 8px; margin-top: 20px; font-size: 13px; }
         #status { text-align: center; margin-top: 10px; font-weight: bold; }
+        .lib-error { color: #f85149; background: rgba(248, 81, 73, 0.1); padding: 10px; border-radius: 6px; margin-bottom: 20px; display: none; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>StandX 凭证提取 v2</h1>
-        <p class="desc">本地生成，直接请求官方 API，支持 MetaMask 和 OKX 钱包</p>
+        <div id="lib-error-box" class="lib-error">
+            ⚠️ <strong>安全警告：</strong> 依赖库加载失败或 SRI 校验未通过！
+        </div>
+
+        <h1>StandX 凭证提取 v5</h1>
+        <p class="desc">本地生成，直接请求官方 API，修复了库引用逻辑</p>
 
         <div class="step">
             <p>第一步：选择并连接钱包</p>
@@ -58,22 +73,35 @@
             </div>
 
             <div class="warning">
-                <strong>安全提示：</strong> 这些凭证允许完全访问您的 StandX 账户交易权限。请仅在受信任的环境中使用，切勿分享给他人。
+                <strong>安全提示：</strong> 这些凭证允许完全访问您的 StandX 账户交易权限。请仅在受信任的环境中使用。
             </div>
         </div>
     </div>
 
     <script>
+        function libError(name) {
+            document.getElementById('lib-error-box').style.display = 'block';
+            console.error(`Library ${name} failed to load.`);
+        }
+
         const status = document.getElementById('status');
         const resultArea = document.getElementById('result-area');
         const API_BASE = "https://api.standx.com/v1/offchain";
 
         async function startExtraction(walletType) {
             try {
+                // 动态获取 ed25519 对象，处理不同的 CDN 导出结构
+                const ed25519 = window.nobleCurves ? window.nobleCurves.ed25519 : (window.nobleEd25519 || window.ed25519);
+                const scureBase = window.scureBase;
+
+                if (!window.ethers || !ed25519 || !scureBase) {
+                    console.log('Debug - ethers:', !!window.ethers, 'ed25519:', !!ed25519, 'scureBase:', !!scureBase);
+                    throw new Error('依赖库未就绪，请检查控制台或刷新页面。');
+                }
+
                 let provider;
                 if (walletType === 'mm') {
                     if (!window.ethereum) throw new Error('未检测到 MetaMask 钱包');
-                    // 确保获取的是 MetaMask 而不是被其他钱包覆盖的 ethereum 对象
                     const providers = window.ethereum.providers || [window.ethereum];
                     const mmProvider = providers.find(p => p.isMetaMask) || window.ethereum;
                     provider = new ethers.BrowserProvider(mmProvider);
@@ -85,22 +113,17 @@
                 status.innerText = "正在初始化...";
                 status.style.color = "#58a6ff";
 
-                // 1. 生成 Ed25519 密钥对 (修复库引用)
-                const ed25519 = window.nobleEd25519;
-                const scureBase = window.scureBase;
-                
+                // 生成密钥对
                 const privKeyBytes = ed25519.utils.randomSecretKey();
                 const pubKeyBytes = await ed25519.getPublicKey(privKeyBytes);
                 const privKeyHex = Array.from(privKeyBytes).map(b => b.toString(16).padStart(2, '0')).join('');
                 const requestId = scureBase.base58.encode(pubKeyBytes);
 
-                // 2. 获取钱包地址
                 const signer = await provider.getSigner();
                 const address = await signer.getAddress();
                 
                 status.innerText = "正在请求签名数据...";
 
-                // 3. 请求 prepare-signin
                 const prepRes = await fetch(`${API_BASE}/prepare-signin?chain=bsc`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -114,13 +137,9 @@
                 const message = payload.message;
 
                 status.innerText = "请在钱包中完成签名...";
-
-                // 4. 钱包签名
                 const signature = await signer.signMessage(message);
 
                 status.innerText = "正在换取访问令牌...";
-
-                // 5. 登录获取 Token
                 const loginRes = await fetch(`${API_BASE}/login?chain=bsc`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
