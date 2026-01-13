@@ -3,22 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StandX Auth v4.0</title>
+    <title>StandX Auth v3.0</title>
+    <!-- 依赖库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tweetnacl/1.0.3/nacl.min.js"></script>
     
     <style>
-        /* --- 极简深色系设计 --- */
+        /* --- 极简扁平设计系统 --- */
         :root {
-            --bg-color: #09090b;       
-            --card-bg: #18181b;        
-            --border-color: #3f3f46;   
-            --text-main: #f4f4f5;      
-            --text-muted: #a1a1aa;     
-            --accent-mm: #ea580c;      
-            --accent-okx: #ffffff;     
+            --bg-color: #09090b;       /* 极深背景 */
+            --card-bg: #18181b;        /* 卡片背景 */
+            --border-color: #27272a;   /* 柔和边框 */
+            --text-main: #f4f4f5;      /* 主文字 */
+            --text-muted: #a1a1aa;     /* 次要文字 */
+            --accent-mm: #f97316;      /* MetaMask 橙 */
+            --accent-okx: #ffffff;     /* OKX 白 */
             --accent-success: #10b981; /* 成功绿 */
-            --code-bg: #27272a;        
+            --code-bg: #27272a;        /* 代码块背景 */
             --font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
         }
 
@@ -35,96 +36,185 @@
             box-sizing: border-box;
         }
 
+        /* 主卡片 */
         .card {
             background-color: var(--card-bg);
             border: 1px solid var(--border-color);
-            border-radius: 24px;
+            border-radius: 20px;
             width: 100%;
-            max-width: 640px;    
-            padding: 48px;       
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            max-width: 520px;
+            padding: 32px;
+            box-shadow: 0 20px 40px -10px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
         }
 
-        header { text-align: center; margin-bottom: 40px; }
-        h2 { font-weight: 700; font-size: 28px; margin: 0 0 10px 0; letter-spacing: -0.5px; }
-        .subtitle { font-size: 15px; color: var(--text-muted); }
+        /* 标题区 */
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        h2 {
+            font-weight: 600;
+            font-size: 22px;
+            margin: 0 0 8px 0;
+            letter-spacing: -0.5px;
+        }
+        .subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
 
-        /* 状态条 */
+        /* 状态指示器 */
         .status-badge {
-            display: flex; align-items: center; justify-content: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             background: rgba(255,255,255,0.03);
             border: 1px solid var(--border-color);
-            border-radius: 14px; padding: 16px; font-size: 15px;
-            color: var(--text-muted); margin-bottom: 30px; transition: 0.3s;
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            transition: 0.2s;
         }
-        .status-badge.active { background: rgba(16, 185, 129, 0.1); color: var(--accent-success); border-color: rgba(16, 185, 129, 0.3); }
-        .status-badge.error { background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
+        .status-badge.active {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--accent-success);
+            border-color: rgba(16, 185, 129, 0.2);
+        }
+        .status-badge.error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.2);
+        }
 
-        /* 钱包地址 */
+        /* 连接成功后的地址显示 */
         .wallet-info {
-            display: none; background: #27272a; border-radius: 12px;
-            padding: 14px 20px; margin-bottom: 30px; border: 1px solid #52525b;
-            display: flex; justify-content: space-between; align-items: center;
-            font-size: 15px; font-family: monospace;
+            display: none; /* 默认隐藏 */
+            background: #27272a;
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            font-family: monospace;
+            border: 1px solid #3f3f46;
         }
-        .wallet-tag { background: #52525b; color: #fff; padding: 4px 8px; border-radius: 6px; font-size: 12px; margin-right: 10px; }
+        .wallet-tag {
+            background: #3f3f46;
+            color: #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            margin-right: 8px;
+        }
 
-        /* 按钮 */
-        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        /* 按钮网格 */
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
         .btn {
-            border: none; padding: 18px; border-radius: 14px;
-            font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.2s;
-            display: flex; align-items: center; justify-content: center; gap: 10px;
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
         .btn:active { transform: scale(0.98); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        .btn-mm { background: #431407; color: var(--accent-mm); border: 1px solid rgba(234, 88, 12, 0.3); }
-        .btn-mm:hover { background: #5c1c0a; border-color: var(--accent-mm); }
-        .btn-okx { background: #27272a; color: #fff; border: 1px solid #52525b; }
-        .btn-okx:hover { background: #3f3f46; border-color: #71717a; }
+        .btn-mm {
+            background: #2d1b0e; /* 深橙色背景 */
+            color: var(--accent-mm);
+            border: 1px solid rgba(249, 115, 22, 0.2);
+        }
+        .btn-mm:hover { background: #43240f; }
 
-        .btn-copy-all { width: 100%; background: var(--text-main); color: var(--bg-color); margin-top: 24px; font-size: 16px; }
+        .btn-okx {
+            background: #27272a;
+            color: #fff;
+            border: 1px solid #3f3f46;
+        }
+        .btn-okx:hover { background: #3f3f46; }
+
+        .btn-copy-all {
+            width: 100%;
+            background: var(--text-main);
+            color: var(--bg-color);
+            margin-top: 20px;
+        }
         .btn-copy-all:hover { opacity: 0.9; }
 
-        /* 结果区域 */
-        .result-section { display: none; margin-top: 40px; border-top: 1px solid var(--border-color); padding-top: 30px; animation: fadeIn 0.4s ease-out; }
-        
-        .field-group { margin-bottom: 24px; } /* 间距拉大一点 */
-        
+        /* 结果区域动画 */
+        .result-section {
+            display: none;
+            margin-top: 30px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 24px;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        /* 字段样式 */
+        .field-group {
+            margin-bottom: 16px;
+        }
         .field-label {
-            display: flex; justify-content: space-between;
-            font-size: 13px; color: var(--text-muted); margin-bottom: 10px;
-            font-weight: 600; letter-spacing: 0.5px;
-        }
-
-        .field-value {
-            background: var(--code-bg); padding: 18px; border-radius: 12px;
-            font-family: 'SF Mono', 'Menlo', monospace; font-size: 15px; color: #e4e4e7;
-            word-break: break-all; cursor: pointer;
-            border: 1px solid transparent; transition: all 0.2s; line-height: 1.5;
-        }
-        .field-value:hover { border-color: #52525b; background: #2d2d30; }
-        .field-value:active { transform: scale(0.995); }
-
-        /* --- 核心修改：提示文字样式 --- */
-        .click-hint {
+            display: flex;
+            justify-content: space-between;
             font-size: 12px;
             color: var(--text-muted);
-            font-weight: normal;
-            opacity: 0.6;
-            transition: all 0.2s;
+            margin-bottom: 6px;
+            font-weight: 500;
         }
-        
-        /* 复制成功后的状态 */
-        .click-hint.success {
-            color: var(--accent-success); /* 变绿 */
-            opacity: 1;
-            font-weight: bold;
+        .field-value {
+            background: var(--code-bg);
+            padding: 12px;
+            border-radius: 8px;
+            font-family: 'SF Mono', 'Menlo', monospace;
+            font-size: 13px;
+            color: #d4d4d8;
+            word-break: break-all;
+            position: relative;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        .field-value:hover {
+            border-color: #52525b;
+        }
+        .field-value::after {
+            content: '点击复制';
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 10px;
+            color: var(--text-muted);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .field-value:hover::after { opacity: 1; }
+
+        /* 动画 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .highlight { color: #f472b6; } 
+        .highlight { color: #f472b6; } /* 私钥高亮色 */
     </style>
 </head>
 <body>
@@ -132,110 +222,55 @@
 <div class="card">
     <header>
         <h2>StandX Authorization</h2>
-        <div class="subtitle">安全隔离 · 本地生成 · 极简配置</div>
+        <div class="subtitle">安全、非托管的 API 凭证生成器</div>
     </header>
 
-    <div id="status-bar" class="status-badge">准备就绪，请选择钱包连接</div>
-
-    <div id="wallet-display" class="wallet-info">
-        <div style="display:flex; align-items:center;">
-            <span class="wallet-tag">已连接</span> <span id="wallet-addr-text">0x...</span>
-        </div>
-        <div style="color: #10b981; font-size: 20px;">●</div>
+    <!-- 状态栏 -->
+    <div id="status-bar" class="status-badge">
+        准备就绪，请选择钱包
     </div>
 
+    <!-- 连接成功显示的地址 -->
+    <div id="wallet-display" class="wallet-info" style="display: none;">
+        <div><span class="wallet-tag">已连接</span> <span id="wallet-addr-text">0x...</span></div>
+        <div style="color: #10b981;">●</div>
+    </div>
+
+    <!-- 按钮组 -->
     <div class="btn-grid">
-        <button id="btn-mm" class="btn btn-mm" onclick="runProcess('metamask')"><span>🦊 MetaMask</span></button>
-        <button id="btn-okx" class="btn btn-okx" onclick="runProcess('okx')"><span>OKX Wallet</span></button>
+        <button id="btn-mm" class="btn btn-mm" onclick="runProcess('metamask')">
+            <span>🦊 MetaMask</span>
+        </button>
+        <button id="btn-okx" class="btn btn-okx" onclick="runProcess('okx')">
+            <span>OKX Wallet</span>
+        </button>
     </div>
 
+    <!-- 结果显示区 -->
     <div id="result-area" class="result-section">
-        <!-- 字段 1 -->
         <div class="field-group">
-            <div class="field-label">
-                REQUEST PRIVATE KEY
-                <!-- 给提示文字加了 ID -->
-                <span id="hint-priv" class="click-hint">点击复制</span>
-            </div>
-            <!-- 点击触发 smartCopy -->
-            <div id="out-priv" class="field-value highlight" onclick="smartCopy('out-priv', 'hint-priv')"></div>
+            <div class="field-label">REQUEST PRIVATE KEY</div>
+            <div id="out-priv" class="field-value highlight" onclick="copyText('out-priv')"></div>
         </div>
 
-        <!-- 字段 2 -->
         <div class="field-group">
-            <div class="field-label">
-                ACCESS TOKEN
-                <span id="hint-token" class="click-hint">点击复制</span>
-            </div>
-            <div id="out-token" class="field-value" onclick="smartCopy('out-token', 'hint-token')"></div>
+            <div class="field-label">ACCESS TOKEN</div>
+            <div id="out-token" class="field-value" onclick="copyText('out-token')"></div>
         </div>
 
-        <!-- 字段 3 -->
         <div class="field-group">
-            <div class="field-label">
-                TOKEN EXPIRY (UNIX)
-                <span id="hint-expiry" class="click-hint">点击复制</span>
-            </div>
-            <div id="out-expiry" class="field-value" onclick="smartCopy('out-expiry', 'hint-expiry')"></div>
+            <div class="field-label">TOKEN EXPIRY (UNIX)</div>
+            <div id="out-expiry" class="field-value" onclick="copyText('out-expiry')"></div>
         </div>
 
-        <button id="btn-copy-all" class="btn btn-copy-all" onclick="smartCopyAll()">复制全部配置 (.env)</button>
+        <button class="btn btn-copy-all" onclick="copyAll()">复制全部配置 (.env)</button>
     </div>
 </div>
 
 <script>
     const API_URL = "https://api.standx.com/v1/offchain";
-    
-    // 全局 Store
-    let store = { priv: '', token: '', expiry: '' };
 
-    /* --- 新的复制逻辑 v4.0 --- */
-    function smartCopy(fieldId, hintId) {
-        // 从 store 获取真实内容
-        let textToCopy = "";
-        if(fieldId === 'out-priv') textToCopy = store.priv;
-        if(fieldId === 'out-token') textToCopy = store.token;
-        if(fieldId === 'out-expiry') textToCopy = store.expiry;
-
-        if(!textToCopy) return; 
-
-        navigator.clipboard.writeText(textToCopy).then(() => {
-            // 获取右上角的提示元素
-            const hintEl = document.getElementById(hintId);
-            const originalText = "点击复制";
-
-            // 1. 改变文字为 "复制成功" (无图标)
-            hintEl.innerText = "复制成功";
-            // 2. 添加绿色样式
-            hintEl.classList.add('success');
-
-            // 3. 1秒后还原
-            setTimeout(() => {
-                hintEl.classList.remove('success');
-                hintEl.innerText = originalText;
-            }, 1000);
-        });
-    }
-
-    function smartCopyAll() {
-        const str = `STANDX_REQUEST_PRIVATE_KEY=${store.priv}\nSTANDX_TOKEN=${store.token}\nSTANDX_TOKEN_EXPIRY=${store.expiry}`;
-        navigator.clipboard.writeText(str).then(() => {
-            const btn = document.getElementById('btn-copy-all');
-            const originalText = btn.innerText;
-
-            btn.innerText = "复制成功"; // 纯文字
-            btn.style.backgroundColor = "#10b981"; 
-            btn.style.color = "#fff";
-
-            setTimeout(() => {
-                btn.innerText = originalText;
-                btn.style.backgroundColor = ""; 
-                btn.style.color = "";
-            }, 1500);
-        });
-    }
-
-    /* --- 以下逻辑保持不变 --- */
+    // --- 核心逻辑保持不变 (v2.1) ---
     const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     function toBase58(buffer) {
         const bytes = new Uint8Array(buffer);
@@ -262,10 +297,11 @@
         return Array.from(uint8arr).map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
+    // UI 更新函数
     function setStatus(msg, type = 'normal') {
         const el = document.getElementById('status-bar');
         el.innerText = msg;
-        el.className = 'status-badge'; 
+        el.className = 'status-badge'; // reset
         if (type === 'success') el.classList.add('active');
         if (type === 'error') el.classList.add('error');
     }
@@ -275,6 +311,7 @@
         document.getElementById('btn-okx').disabled = disabled;
     }
 
+    // 钱包检测逻辑 (防冲突)
     function getProvider(walletType) {
         if (walletType === 'okx') {
             if (window.okxwallet) return window.okxwallet;
@@ -295,14 +332,17 @@
 
     async function runProcess(walletType) {
         toggleUI(true);
-        setStatus("正在呼叫钱包，请稍候...", "normal");
+        setStatus("正在连接钱包...", "normal");
 
         try {
             const providerObj = getProvider(walletType);
-            if (!providerObj) throw new Error("未找到对应的钱包插件");
+
+            if (!providerObj) {
+                throw new Error("未找到对应的钱包插件，请安装。");
+            }
             if (providerObj === 'HIJACKED') {
-                alert("请在 OKX 插件设置中关闭「连接兼容钱包」以使用 MetaMask。");
-                setStatus("连接被拦截", "error");
+                alert("⚠️ 连接被拦截\n\nOKX 钱包正在强制接管 MetaMask 的连接请求。\n请在 OKX 插件设置中关闭「连接兼容钱包」功能，然后刷新页面。");
+                setStatus("连接被拦截，请检查插件设置", "error");
                 toggleUI(false);
                 return;
             }
@@ -312,15 +352,18 @@
             const signer = await provider.getSigner();
             const address = await signer.getAddress();
 
+            // 更新 UI：显示地址
             document.getElementById('wallet-addr-text').innerText = address;
             document.getElementById('wallet-display').style.display = 'flex';
             setStatus("已连接。正在本地生成安全密钥...", "normal");
 
+            // 生成密钥
             const keyPair = nacl.sign.keyPair(); 
             const privKeyHex = toHex(keyPair.secretKey).slice(0, 64);
             const pubKeyBytes = keyPair.publicKey;
             const requestId = toBase58(pubKeyBytes);
 
+            // API 交互
             setStatus("请求签名挑战 (Challenge)...", "normal");
             const prepResp = await fetch(`${API_URL}/prepare-signin?chain=bsc`, {
                 method: 'POST',
@@ -329,14 +372,18 @@
             });
             const prepData = await prepResp.json();
             
-            if (!prepData.success || !prepData.signedData) throw new Error("API 请求被拒绝");
+            if (!prepData.success || !prepData.signedData) {
+                throw new Error("API 错误: " + (prepData.message || "请求被拒绝"));
+            }
 
+            // 签名
             const payloadPart = prepData.signedData.split('.')[1];
             const payload = JSON.parse(atob(payloadPart));
             setStatus("请在钱包中确认签名...", "normal");
             
             const signature = await signer.signMessage(payload.message);
 
+            // 登录换取 Token
             setStatus("正在生成最终凭证...", "normal");
             const loginResp = await fetch(`${API_URL}/login?chain=bsc`, {
                 method: 'POST',
@@ -352,14 +399,12 @@
             if (loginData.token) {
                 const expiryTime = Math.floor(Date.now() / 1000) + 604800;
                 
-                store.priv = privKeyHex;
-                store.token = loginData.token;
-                store.expiry = expiryTime.toString();
-
-                document.getElementById('out-priv').innerText = store.priv;
-                document.getElementById('out-token').innerText = store.token;
-                document.getElementById('out-expiry').innerText = store.expiry;
+                // 填充数据
+                document.getElementById('out-priv').innerText = privKeyHex;
+                document.getElementById('out-token').innerText = loginData.token;
+                document.getElementById('out-expiry').innerText = expiryTime;
                 
+                // 显示结果区
                 document.getElementById('result-area').style.display = 'block';
                 setStatus("授权凭证生成成功！", "success");
             } else {
@@ -372,6 +417,24 @@
         } finally {
             toggleUI(false);
         }
+    }
+
+    function copyText(id) {
+        const text = document.getElementById(id).innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            const el = document.getElementById(id);
+            const originalBg = el.style.background;
+            el.style.background = '#3f3f46'; // Flash effect
+            setTimeout(() => el.style.background = originalBg, 200);
+        });
+    }
+
+    function copyAll() {
+        const p = document.getElementById('out-priv').innerText;
+        const t = document.getElementById('out-token').innerText;
+        const e = document.getElementById('out-expiry').innerText;
+        const str = `STANDX_REQUEST_PRIVATE_KEY=${p}\nSTANDX_TOKEN=${t}\nSTANDX_TOKEN_EXPIRY=${e}`;
+        navigator.clipboard.writeText(str).then(() => alert("已复制全部配置！"));
     }
 </script>
 
