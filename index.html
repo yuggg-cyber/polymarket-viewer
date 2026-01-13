@@ -3,202 +3,203 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StandX 本地凭证提取工具 v8 (专业版)</title>
-    
+    <title>StandX 安全授权生成器 (纯前端版)</title>
+    <!-- 引入 Ethers.js (钱包连接) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js"></script>
-
+    <!-- 引入 TweetNaCl (Ed25519 加密算法) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tweetnacl/1.0.3/nacl.min.js"></script>
+    
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #0d1117; color: #c9d1d9; padding: 20px; line-height: 1.6; }
-        .container { max-width: 800px; margin: 0 auto; background: #161b22; padding: 30px; border-radius: 12px; border: 1px solid #30363d; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
-        h1 { color: #58a6ff; text-align: center; margin-bottom: 10px; }
-        .desc { text-align: center; color: #8b949e; margin-bottom: 30px; font-size: 0.9em; }
-        .step { margin-bottom: 20px; padding: 15px; background: #0d1117; border-radius: 8px; border-left: 4px solid #238636; }
-        .btn-group { display: flex; gap: 10px; margin-bottom: 10px; }
-        button { background-color: #238636; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 600; flex: 1; transition: background 0.2s; }
-        button.okx { background-color: #ffffff; color: #000000; }
-        button:hover { opacity: 0.9; }
-        button:disabled { background-color: #213322; color: #8b949e; cursor: not-allowed; }
-        .result-area { margin-top: 30px; display: none; }
-        .field { margin-bottom: 20px; position: relative; }
-        .label { display: block; color: #8b949e; font-size: 12px; margin-bottom: 5px; text-transform: uppercase; }
-        .value-container { position: relative; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; padding-right: 80px; word-break: break-all; font-family: monospace; font-size: 14px; min-height: 20px; }
-        .copy-btn { position: absolute; right: 10px; top: 30px; background: #30363d; color: #c9d1d9; font-size: 11px; padding: 4px 8px; border-radius: 4px; cursor: pointer; border: 1px solid #444c56; }
-        .copy-btn:hover { background: #444c56; }
-        .warning { background: rgba(210, 153, 34, 0.1); border: 1px solid #d29922; color: #d29922; padding: 15px; border-radius: 8px; margin-top: 20px; font-size: 13px; }
-        #status { text-align: center; margin-top: 10px; font-weight: bold; }
-        .copy-all { margin-top: 20px; background: #1f6feb; }
+        :root { --bg: #0f111a; --card: #1e2330; --primary: #3b82f6; --text: #e2e8f0; --muted: #94a3b8; --border: #2d3748; }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; padding-top: 50px; margin: 0; }
+        .container { background-color: var(--card); width: 100%; max-width: 600px; padding: 30px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid var(--border); }
+        h2 { text-align: center; margin-top: 0; color: #fff; }
+        .status-box { background: #13161c; border: 1px solid #334155; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 13px; color: var(--muted); margin-bottom: 20px; min-height: 40px; display: flex; align-items: center; justify-content: center; }
+        .btn { width: 100%; padding: 14px; background-color: var(--primary); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: 0.2s; margin-bottom: 10px; }
+        .btn:hover { background-color: #2563eb; }
+        .btn:disabled { background-color: #334155; cursor: not-allowed; opacity: 0.7; }
+        .result-group { margin-top: 25px; display: none; border-top: 1px solid var(--border); padding-top: 20px; }
+        .field-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: flex; justify-content: space-between; }
+        .field-box { background: #0f111a; border: 1px solid var(--border); color: #a5b4fc; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 14px; word-break: break-all; position: relative; margin-bottom: 15px; }
+        .copy-tag { font-size: 11px; color: var(--primary); cursor: pointer; text-decoration: underline; }
+        .security-note { font-size: 12px; color: #fbbf24; background: rgba(251, 191, 36, 0.1); padding: 10px; border-radius: 6px; margin-bottom: 20px; border: 1px solid rgba(251, 191, 36, 0.2); }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>StandX 凭证提取 v8</h1>
-        <p class="desc">本地生成，支持 MetaMask/OKX 独立连接，带复制功能</p>
 
-        <div class="step">
-            <p>第一步：选择并连接钱包</p>
-            <div class="btn-group">
-                <button id="btn-mm">连接 MetaMask</button>
-                <button id="btn-okx" class="okx">连接 OKX Wallet</button>
-            </div>
-            <div id="status"></div>
-        </div>
-
-        <div id="result-area" class="result-area">
-            <div class="field">
-                <span class="label">代理钱包私钥 / AGENT WALLET PRIVATE KEY</span>
-                <div class="label" style="text-transform: none;">STANDX_REQUEST_PRIVATE_KEY</div>
-                <div class="value-container">
-                    <span id="res-privkey"></span>
-                    <div class="copy-btn" onclick="copyText('res-privkey')">复制</div>
-                </div>
-            </div>
-
-            <div class="field">
-                <span class="label">访问令牌 / ACCESS TOKEN (JWT)</span>
-                <div class="label" style="text-transform: none;">STANDX_TOKEN</div>
-                <div class="value-container">
-                    <span id="res-token"></span>
-                    <div class="copy-btn" onclick="copyText('res-token')">复制</div>
-                </div>
-            </div>
-
-            <div class="field">
-                <span class="label">令牌过期时间 / TOKEN EXPIRY (7 DAYS)</span>
-                <div class="label" style="text-transform: none;">STANDX_TOKEN_EXPIRY</div>
-                <div class="value-container">
-                    <span id="res-expiry"></span>
-                    <div class="copy-btn" onclick="copyText('res-expiry')">复制</div>
-                </div>
-            </div>
-
-            <button class="copy-all" onclick="copyAll()">复制全部 (用于 .env)</button>
-
-            <div class="warning">
-                <strong>安全提示：</strong> 这些凭证允许完全访问您的 StandX 账户交易权限。请仅在受信任的环境中使用。
-            </div>
-        </div>
+<div class="container">
+    <h2>StandX API 凭证生成器</h2>
+    
+    <div class="security-note">
+        <strong>🔒 安全机制说明：</strong><br>
+        1. 您的交易私钥 (Ed25519) 完全在浏览器本地生成。<br>
+        2. 只有<b>公钥</b>会被发送给服务器进行注册。<br>
+        3. <b>私钥绝不离线</b>，也不通过网络传输。
     </div>
 
-    <script>
-        // --- 内置 Base58 编码逻辑 ---
-        const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-        function encodeBase58(source) {
-            if (source.length === 0) return '';
-            let digits = [0];
-            for (let i = 0; i < source.length; i++) {
-                for (let j = 0; j < digits.length; j++) digits[j] <<= 8;
-                digits[0] += source[i];
-                let carry = 0;
-                for (let j = 0; j < digits.length; j++) {
-                    digits[j] += carry;
-                    carry = (digits[j] / 58) | 0;
-                    digits[j] %= 58;
-                }
-                while (carry) {
-                    digits.push(carry % 58);
-                    carry = (carry / 58) | 0;
-                }
+    <div id="status" class="status-box">等待操作...</div>
+
+    <button id="btn-connect" class="btn" onclick="runProcess()">连接钱包并生成凭证</button>
+
+    <div id="results" class="result-group">
+        <div class="field-label">
+            <span>请求私钥 (STANDX_REQUEST_PRIVATE_KEY)</span>
+            <span class="copy-tag" onclick="copyText('out-priv')">复制</span>
+        </div>
+        <div id="out-priv" class="field-box" style="color: #f472b6;"></div>
+
+        <div class="field-label">
+            <span>访问令牌 (STANDX_TOKEN)</span>
+            <span class="copy-tag" onclick="copyText('out-token')">复制</span>
+        </div>
+        <div id="out-token" class="field-box"></div>
+
+        <div class="field-label">
+            <span>过期时间 (STANDX_TOKEN_EXPIRY)</span>
+        </div>
+        <div id="out-expiry" class="field-box"></div>
+
+        <button class="btn" style="background-color: #10b981; margin-top: 10px;" onclick="copyAll()">复制全部配置 (用于 .env)</button>
+    </div>
+</div>
+
+<script>
+    // 配置 StandX 的 API 地址 (根据你之前提供的代码)
+    const API_URL = "https://api.standx.com/v1/offchain";
+
+    // 工具函数：Base58 编码 (用于生成 requestId)
+    const ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    function toBase58(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let digits = [0];
+        for (let i = 0; i < bytes.length; i++) {
+            for (let j = 0; j < digits.length; j++) digits[j] <<= 8;
+            digits[0] += bytes[i];
+            let carry = 0;
+            for (let j = 0; j < digits.length; j++) {
+                digits[j] += carry;
+                carry = (digits[j] / 58) | 0;
+                digits[j] %= 58;
             }
-            for (let i = 0; source[i] === 0 && i < source.length - 1; i++) digits.push(0);
-            return digits.reverse().map(d => ALPHABET[d]).join('');
-        }
-
-        async function generateEd25519() {
-            const keyPair = await window.crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
-            const privRaw = await window.crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
-            const pubRaw = await window.crypto.subtle.exportKey("raw", keyPair.publicKey);
-            const privBytes = new Uint8Array(privRaw).slice(-32);
-            const pubBytes = new Uint8Array(pubRaw);
-            const privHex = Array.from(privBytes).map(b => b.toString(16).padStart(2, '0')).join('');
-            const requestId = encodeBase58(pubBytes);
-            return { privHex, requestId };
-        }
-
-        function copyText(id) {
-            const text = document.getElementById(id).innerText;
-            navigator.clipboard.writeText(text).then(() => alert('已复制到剪贴板'));
-        }
-
-        function copyAll() {
-            const priv = document.getElementById('res-privkey').innerText;
-            const token = document.getElementById('res-token').innerText;
-            const expiry = document.getElementById('res-expiry').innerText;
-            const all = `STANDX_REQUEST_PRIVATE_KEY=${priv}\nSTANDX_TOKEN=${token}\nSTANDX_TOKEN_EXPIRY=${expiry}`;
-            navigator.clipboard.writeText(all).then(() => alert('已复制全部配置'));
-        }
-
-        const status = document.getElementById('status');
-        const resultArea = document.getElementById('result-area');
-        const API_BASE = "https://api.standx.com/v1/offchain";
-
-        async function startExtraction(walletType) {
-            try {
-                let ethProvider;
-                if (walletType === 'mm') {
-                    if (!window.ethereum) throw new Error('未检测到 MetaMask');
-                    // 寻找真正的 MetaMask 实例
-                    const providers = window.ethereum.providers || [window.ethereum];
-                    ethProvider = providers.find(p => p.isMetaMask);
-                    if (!ethProvider) ethProvider = window.ethereum;
-                } else {
-                    if (!window.okxwallet) throw new Error('未检测到 OKX Wallet');
-                    ethProvider = window.okxwallet;
-                }
-
-                const provider = new ethers.BrowserProvider(ethProvider);
-                status.innerText = "正在生成本地密钥...";
-                status.style.color = "#58a6ff";
-
-                const { privHex, requestId } = await generateEd25519();
-                const signer = await provider.getSigner();
-                const address = await signer.getAddress();
-                
-                status.innerText = "正在请求签名数据...";
-                const prepRes = await fetch(`${API_BASE}/prepare-signin?chain=bsc`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ address, requestId })
-                });
-                const prepData = await prepRes.json();
-                if (!prepData.success) throw new Error("准备登录失败");
-
-                const signedData = prepData.signedData;
-                const payload = JSON.parse(atob(signedData.split('.')[1]));
-                const message = payload.message;
-
-                status.innerText = "请在钱包中完成签名...";
-                const signature = await signer.signMessage(message);
-
-                status.innerText = "正在换取访问令牌...";
-                const loginRes = await fetch(`${API_BASE}/login?chain=bsc`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ signature, signedData, expiresSeconds: 604800 })
-                });
-                const loginData = await loginRes.json();
-                
-                if (loginData.token) {
-                    const now = Math.floor(Date.now() / 1000);
-                    const expiry = now + 604800; // 7天后
-
-                    document.getElementById('res-privkey').innerText = privHex;
-                    document.getElementById('res-token').innerText = loginData.token;
-                    document.getElementById('res-expiry').innerText = expiry;
-                    
-                    resultArea.style.display = 'block';
-                    status.innerText = "✅ 提取成功！";
-                    status.style.color = "#238636";
-                } else {
-                    throw new Error("登录失败");
-                }
-            } catch (err) {
-                status.innerText = "❌ 错误: " + err.message;
-                status.style.color = "#f85149";
+            while (carry) {
+                digits.push(carry % 58);
+                carry = (carry / 58) | 0;
             }
         }
+        for (let i = 0; bytes[i] === 0 && i < bytes.length - 1; i++) digits.push(0);
+        return digits.reverse().map(d => ALPHABET[d]).join('');
+    }
 
-        document.getElementById('btn-mm').onclick = () => startExtraction('mm');
-        document.getElementById('btn-okx').onclick = () => startExtraction('okx');
-    </script>
+    // 工具函数：Hex 转换
+    function toHex(uint8arr) {
+        return Array.from(uint8arr).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // 更新状态显示
+    function setStatus(msg, type = 'normal') {
+        const el = document.getElementById('status');
+        el.innerText = msg;
+        el.style.color = type === 'error' ? '#f87171' : (type === 'success' ? '#4ade80' : '#94a3b8');
+    }
+
+    async function runProcess() {
+        const btn = document.getElementById('btn-connect');
+        try {
+            btn.disabled = true;
+            
+            // 1. 检查钱包环境
+            if (!window.ethereum) throw new Error("未检测到 MetaMask 或其他 Web3 钱包");
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            setStatus("正在请求钱包连接...");
+            await provider.send("eth_requestAccounts", []);
+            const signer = await provider.getSigner();
+            const address = await signer.getAddress();
+
+            // 2. 本地生成 Ed25519 密钥对 (使用 TweetNaCl)
+            setStatus("正在本地生成安全密钥...");
+            // 生成随机密钥对
+            const keyPair = nacl.sign.keyPair(); 
+            const privKeyHex = toHex(keyPair.secretKey).slice(0, 64); // 取前32字节作为私钥种子(Hex长度64)
+            const pubKeyBytes = keyPair.publicKey;
+            const requestId = toBase58(pubKeyBytes); // 转换为 StandX 需要的 Base58 格式
+
+            console.log("Generated Local PubKey (RequestId):", requestId);
+
+            // 3. 向服务器注册公钥 (Pre-Sign)
+            setStatus("正在请求服务器验证挑战...");
+            const prepResp = await fetch(`${API_URL}/prepare-signin?chain=bsc`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    address: address, 
+                    requestId: requestId // 发送公钥
+                })
+            });
+            const prepData = await prepResp.json();
+            
+            if (!prepData.success || !prepData.signedData) {
+                throw new Error("服务器拒绝了请求: " + (prepData.message || "未知错误"));
+            }
+
+            // 4. 解析服务器挑战并签名
+            // 服务器返回了一个 JWT 格式的 signedData，我们需要对其中的 message 字段签名
+            // 这里的逻辑是：Server 给你一段话，你签名，证明你拥有这个钱包地址
+            const payloadPart = prepData.signedData.split('.')[1];
+            const payload = JSON.parse(atob(payloadPart));
+            const messageToSign = payload.message;
+
+            setStatus("请在钱包中确认签名...");
+            const signature = await signer.signMessage(messageToSign);
+
+            // 5. 提交签名换取 Token
+            setStatus("正在换取访问令牌...");
+            const loginResp = await fetch(`${API_URL}/login?chain=bsc`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    signature: signature,
+                    signedData: prepData.signedData,
+                    expiresSeconds: 604800 // 请求 7 天有效期
+                })
+            });
+            
+            const loginData = await loginResp.json();
+
+            if (loginData.token) {
+                // 成功！显示结果
+                const expiryTime = Math.floor(Date.now() / 1000) + 604800;
+                
+                document.getElementById('out-priv').innerText = privKeyHex;
+                document.getElementById('out-token').innerText = loginData.token;
+                document.getElementById('out-expiry').innerText = expiryTime;
+                
+                document.getElementById('results').style.display = 'block';
+                setStatus("✅ 凭证生成成功！请妥善保存下方信息", "success");
+                btn.innerText = "生成完成";
+            } else {
+                throw new Error("登录失败，未收到 Token");
+            }
+
+        } catch (err) {
+            console.error(err);
+            setStatus("❌ 错误: " + err.message, "error");
+            btn.disabled = false;
+        }
+    }
+
+    function copyText(id) {
+        const text = document.getElementById(id).innerText;
+        navigator.clipboard.writeText(text).then(() => alert("已复制"));
+    }
+
+    function copyAll() {
+        const p = document.getElementById('out-priv').innerText;
+        const t = document.getElementById('out-token').innerText;
+        const e = document.getElementById('out-expiry').innerText;
+        const str = `STANDX_REQUEST_PRIVATE_KEY=${p}\nSTANDX_TOKEN=${t}\nSTANDX_TOKEN_EXPIRY=${e}`;
+        navigator.clipboard.writeText(str).then(() => alert("已复制所有配置，可直接粘贴到 .env 文件"));
+    }
+</script>
+
 </body>
 </html>
